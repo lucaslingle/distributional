@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Union
+import logging
 
 class Histogram:
     def __init__(
@@ -10,6 +11,25 @@ class Histogram:
         num_atoms: int, 
         probs: np.ndarray,
     ) -> None:
+        """Histogram class to represent the distribution of a one-dimensional random variable. 
+
+        Args:
+            vmin: Minimum permitted value for the histogram's random variable.
+            vmax: Maximum permitted value for the histogram's random variable.
+            num_atoms: Number of bins for the histogram.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If vmin is not an int or float.
+            TypeError: If vmax is not an int or float.
+            TypeError: If num_atoms is not an int. 
+            TypeError: If probs is not a numpy.ndarray.
+            ValueError: If probs.shape is not equal to (num_atoms,).
+            ValueError: If probs does not contain non-negative values.
+            ValueError: If probs does not sum to one.  
+        """
         if not isinstance(vmin, int) and not isinstance(vmin, float):
             raise TypeError("input 'vmin' must be int or float type.")
         if not isinstance(vmax, int) and not isinstance(vmax, float):
@@ -20,6 +40,10 @@ class Histogram:
             raise TypeError("input 'probs' must be numpy.ndarray type.")
         if len(probs.shape) != 1 or probs.shape[0] != num_atoms:
             raise ValueError("input 'probs' must be of shape (num_atoms,).")
+        if not np.allclose(probs, np.abs(probs)):
+            raise ValueError("input 'probs' must be non-negative.")
+        if not np.allclose(np.sum(probs), 1.0):
+            raise ValueError("input 'probs' must sum to one.")
         
         self.vmin = vmin
         self.vmax = vmax
@@ -27,33 +51,31 @@ class Histogram:
         self.probs = probs
 
     @property
-    def atom_stride(self):
+    def atom_stride(self) -> float:
+        """float: the histogram bin width.
+        """
         return (self.vmax - self.vmin) / self.num_atoms  # num atoms = num bins
     
     @property
-    def atom_min(self):
+    def atom_min(self) -> float:
+        """float: the center of the leftmost histogram bin.
+        """
         return self.vmin + self.atom_stride / 2
     
     @property
-    def atom_max(self):
+    def atom_max(self) -> float:
+        """float: the center of the rightmost histogram bin.
+        """
         return self.vmax - self.atom_stride / 2
     
     @property
-    def atoms(self):
+    def atoms(self) -> np.ndarray:
+        """numpy.ndarray: the centers for the histogram bins.
+        """
         output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
     
-    def __mul__(self: 'Histogram', coef: Union[int, float]) -> 'Histogram':
-        if not isinstance(coef, int) and not isinstance(coef, float):
-            raise TypeError("input 'coef' must be int or float type.")
-        return Histogram(
-            vmin=coef * self.vmin,
-            vmax=coef * self.vmax,
-            num_atoms=self.num_atoms,
-            probs=np.copy(self.probs),
-        )
-
     def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
             raise TypeError("input 'shift' must be int or float type.")
@@ -63,15 +85,6 @@ class Histogram:
             num_atoms=self.num_atoms,
             probs=np.copy(self.probs),
         )
-
-    def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
-        if isinstance(other, int):
-            return self._shift(float(other))
-        if isinstance(other, float):
-            return self._shift(other)
-        if isinstance(other, Histogram):
-            return self._convolve(other)
-        raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
         if not isinstance(other, Histogram):
@@ -114,8 +127,52 @@ class Histogram:
             num_atoms=2 * self.num_atoms - 1,
             probs=probs,
         )
-    
-    def plot(self):
+
+    def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
+        """Adds a scalar or another random variable to the current histogram's random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        if isinstance(other, int):
+            return self._shift(float(other))
+        if isinstance(other, float):
+            return self._shift(other)
+        if isinstance(other, Histogram):
+            return self._convolve(other)
+        raise TypeError("input 'other' must be int, float, or Histogram type.")
+
+    def __mul__(self: 'Histogram', coef: Union[int, float]) -> 'Histogram':
+        """Multiplies the current histogram's random variable by a scalar. 
+
+        Args:
+            coef: An int or float.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int or float.
+        """
+        if not isinstance(coef, int) and not isinstance(coef, float):
+            raise TypeError("input 'coef' must be int or float type.")
+        return Histogram(
+            vmin=coef * self.vmin,
+            vmax=coef * self.vmax,
+            num_atoms=self.num_atoms,
+            probs=np.copy(self.probs),
+        )
+
+    def plot(self) -> None:
+        """Plot the histogram using matplotlib.
+        """
         plt.bar(
             self.atoms,
             self.probs,
@@ -125,8 +182,24 @@ class Histogram:
         )
         plt.show()
 
-    # work in progress
     def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
+        """Rebin the histogram so that the probability mass of each old bin 
+        is shared according to the proportion of its intersection with each new bin.
+
+        Args:
+            new_vmin: Minimum permitted value for the new histogram's random variable.
+            new_vmax: Maximum permitted value for the new histogram's random variable.
+            new_num_atoms: Number of bins for the new histogram.
+
+        Returns:
+            A new Histogram instance with the rebinned probability mass.
+
+        Raises:
+            ValueError: If the new_vmin is larger than the old one.
+            ValueError: If the new_vmax is smaller than the old one.
+            RuntimeError: If the algorithm does not function as expected. 
+                This should never occur.
+        """
         old_atoms = self.atoms
         old_vmin = self.vmin
         old_vmax = self.vmax
@@ -136,6 +209,8 @@ class Histogram:
         if not (old_vmax <= new_vmax):
             raise ValueError(f"missing right bin coverage of old distribution: (old_vmax > new_vmax), ({old_vmax} > {new_vmax})")
 
+        # pad old distribution with left atoms of zero probability mass
+        # until old bins exceed left range of new ones
         old_left_atom_padding = []
         while (new_vmin < old_vmin):
             old_vmin -= self.atom_stride
@@ -145,6 +220,8 @@ class Histogram:
         old_left_atom_padding.insert(0, old_vmin)
         old_left_atom_padding = np.array(old_left_atom_padding)
 
+        # pad old distribution with right atoms of zero probability mass
+        # until old bins exceed right range of new ones
         old_right_atom_padding = []
         while (old_vmax < new_vmax):
             old_vmax += self.atom_stride
@@ -165,32 +242,36 @@ class Histogram:
             np.zeros_like(old_right_atom_padding),
         ], axis=0)
 
+        # loop over new bins, figure out how much old probability mass they intersect with
         new_atoms = np.arange(new_num_atoms) * new_atom_stride + new_vmin + new_atom_stride/2
         new_probs = np.zeros(dtype=self.probs.dtype, shape=[new_num_atoms])
         j = 0
         for i in range(0, new_num_atoms):
-            print(f"new i: {i}")
+            logging.debug(f"new i: {i}")
             # for each new i, we should only get to it once its left side is past
             # the left side of of old bin j. 
             old_left = old_atoms[j] - self.atom_stride / 2
             old_right = old_atoms[j] + self.atom_stride / 2
             new_left = new_atoms[i] - new_atom_stride / 2
             new_right = new_atoms[i] + new_atom_stride / 2
-            assert old_left <= new_left, f"got (old_left, new_left) == ({old_left}, {new_left})"
+            if not (old_left <= new_left):
+                raise RuntimeError(f"got old_left > new_left: {old_left} > {new_left}")
 
             # now we loop over old bins j and add in the contrib to new bin i
             while (old_left < new_right):
-                print(f"current i,j: {i},{j}")
-                # compute intersection between current i and j.
+                logging.debug(f"current i,j: {i},{j}")
                 old_left = old_atoms[j] - self.atom_stride / 2
                 old_right = old_atoms[j] + self.atom_stride / 2
-                print(f"new_left, new_right: {new_left}, {new_right}")
-                print(f"old_left, old_right: {old_left}, {old_right}")
+                logging.debug(f"new_left, new_right: {new_left}, {new_right}")
+                logging.debug(f"old_left, old_right: {old_left}, {old_right}")
 
+                # compute intersection between current i and j
                 intersect_left = max(new_left, old_left)
                 intersect_right = min(new_right, old_right)
                 frac = (intersect_right - intersect_left) / self.atom_stride
                 new_probs[i] += frac * old_probs[j]
+                # if current new bin's range extends beyond current old bin
+                # continue to next old bin, otherwise we're done with this new bin
                 if old_right < new_right:
                     j += 1
                 else:
