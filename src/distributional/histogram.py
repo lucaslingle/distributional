@@ -27,7 +27,7 @@ class Histogram:
             TypeError: If num_atoms is not an int. 
             TypeError: If probs is not a numpy.ndarray.
             ValueError: If probs.shape is not equal to (num_atoms,).
-            ValueError: If probs does not contain non-negative values.
+            ValueError: If probs contains negative values.
             ValueError: If probs does not sum to one.  
         """
         if not isinstance(vmin, int) and not isinstance(vmin, float):
