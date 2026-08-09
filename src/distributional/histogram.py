@@ -2,92 +2,102 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Union
 
-
 class Histogram:
-    def __init__(self, first_atom: float, num_atoms: int, atom_stride: int, probs: np.ndarray) -> None:
-        self.first_atom = first_atom
+    def __init__(self, vmin: float, vmax: float, num_atoms: int, probs: np.ndarray) -> None:
+        self.vmin = vmin
+        self.vmax = vmax
         self.num_atoms = num_atoms
-        self.atom_stride = atom_stride
         self.probs = probs
 
+    @property
+    def atom_stride(self):
+        return (self.vmax - self.vmin) / self.num_atoms  # num atoms = num bins
+    
+    @property
+    def atom_min(self):
+        return self.vmin + self.atom_stride / 2
+    
+    @property
+    def atom_max(self):
+        return self.vmax - self.atom_stride / 2
+    
+    @property
+    def atoms(self):
+        output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
+        np.testing.assert_allclose(output[-1], self.atom_max)
+        return output
+    
     def __mul__(self: 'Histogram', coef: float) -> 'Histogram':
         return Histogram(
-            first_atom=coef * self.first_atom,
+            vmin=coef * self.vmin,
+            vmax=coef * self.vmax,
             num_atoms=self.num_atoms,
-            atom_stride=coef * self.atom_stride,
             probs=np.copy(self.probs),
         )
 
-    def shift(self: 'Histogram', shift: float) -> 'Histogram':
+    def _shift(self: 'Histogram', shift: float) -> 'Histogram':
         return Histogram(
-            first_atom=shift + self.first_atom,
+            vmin=shift + self.vmin,
+            vmax=shift + self.vmax,
             num_atoms=self.num_atoms,
-            atom_stride=self.atom_stride,
             probs=np.copy(self.probs),
         )
 
     def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
         if isinstance(other, int):
-            return self.shift(other)
+            return self._shift(float(other))
         if isinstance(other, float):
-            return self.shift(other)
-        assert isinstance(other, Histogram)
+            return self._shift(other)
+        if isinstance(other, Histogram):
+            return self._convolve(other)
+        raise TypeError("input 'other' must be int, float, or Histogram type.")
 
-        assert self.first_atom == other.first_atom
+    def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+        assert isinstance(other, Histogram)
+        assert self.vmin == other.vmin
+        assert self.vmax == other.vmax
         assert self.num_atoms == other.num_atoms
-        assert self.atom_stride == other.atom_stride
+
+        conv_size = 2 * self.num_atoms - 1
+        fx = np.fft.rfft(self.probs, n=conv_size)
+        fy = np.fft.rfft(other.probs, n=conv_size)
+        probs = np.fft.irfft(fx * fy, n=conv_size)
+        return Histogram(
+            vmin=self.vmin + other.vmin - self.atom_stride / 2,
+            vmax=self.vmax + other.vmax + self.atom_stride / 2,
+            num_atoms=2 * self.num_atoms - 1,
+            probs=probs,
+        )
+
+    def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+        assert isinstance(other, Histogram)
+        assert self.vmin == other.vmin
+        assert self.vmax == other.vmax
+        assert self.num_atoms == other.num_atoms
+
         probs = np.zeros(dtype=self.probs.dtype, shape=[2 * self.num_atoms - 1])
         for i in range(0, len(self.atoms)):
             for j in range(0, len(self.atoms)):
                 probs[i+j] += self.probs[i] * other.probs[j]
         return Histogram(
-            first_atom=self.first_atom,
+            vmin=self.vmin + other.vmin - self.atom_stride / 2,
+            vmax=self.vmax + other.vmax + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            atom_stride=self.atom_stride,
             probs=probs,
         )
-
-    def convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
-        assert self.first_atom == other.first_atom
-        assert self.num_atoms == other.num_atoms
-        assert self.atom_stride == other.atom_stride
-        # 1. Calculate the size of the output sequence
-        conv_size = 2 * self.num_atoms - 1
-
-        # 2. Compute RFFT for both signals, padded to the output size
-        X = np.fft.rfft(self.probs, n=conv_size)
-        Y = np.fft.rfft(other.probs, n=conv_size)
-
-        # 3. Multiply in the frequency domain and invert back
-        probs = np.fft.irfft(X * Y, n=conv_size)
-        return Histogram(
-            first_atom=self.first_atom,
-            num_atoms=2 * self.num_atoms - 1,
-            atom_stride=self.atom_stride,
-            probs=probs,
-        )
-
-    @property
-    def atoms(self):
-        return np.arange(self.num_atoms) * self.atom_stride + self.first_atom
-
+    
     def plot(self):
-        bin_edges = np.concatenate([self.atoms - self.atom_stride / 2, np.array([self.atoms[-1] + self.atom_stride / 2])], axis=0)
-        #widths = [bin_edges[i+1] - bin_edges[i] for i in range(len(bin_edges)-1)]
-        #bin_centers = [bin_edges[i] + widths[i]/2 for i in range(len(bin_edges)-1)]
-        widths = [self.atom_stride for _ in range(self.num_atoms)]
-        bin_centers = self.atoms
         plt.bar(
-            bin_centers,
+            self.atoms,
             self.probs,
-            width=widths,
+            width=self.atom_stride,
             edgecolor="black",
             align="center"
         )
         plt.show()
 
+    # todo: redo this
     def rebin(self, num_atoms: int, new_vmin: float, new_vmax: float) -> 'Histogram':
-        #def rebin(self, first_atom: float, num_atoms: int, atom_stride: float) -> 'Histogram':
         old_atoms = self.atoms
         old_vmin = old_atoms[0] - self.atom_stride / 2
         old_vmax = old_atoms[-1] + self.atom_stride / 2
