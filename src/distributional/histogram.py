@@ -88,8 +88,8 @@ class Histogram:
         fy = np.fft.rfft(other.probs, n=conv_size)
         probs = np.fft.irfft(fx * fy, n=conv_size)
         return Histogram(
-            vmin=self.vmin + other.vmin - self.atom_stride / 2,
-            vmax=self.vmax + other.vmax + self.atom_stride / 2,
+            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
+            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
             probs=probs,
         )
@@ -109,8 +109,8 @@ class Histogram:
             for j in range(0, len(self.atoms)):
                 probs[i+j] += self.probs[i] * other.probs[j]
         return Histogram(
-            vmin=self.vmin + other.vmin - self.atom_stride / 2,
-            vmax=self.vmax + other.vmax + self.atom_stride / 2,
+            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
+            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
             probs=probs,
         )
@@ -125,8 +125,64 @@ class Histogram:
         )
         plt.show()
 
+    # work in progress
+    def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
+        old_atoms = self.atoms
+        old_vmin = self.vmin
+        old_vmax = self.vmax
+        new_atom_stride = (new_vmax - new_vmin) / new_num_atoms
+        if not (new_vmin <= old_vmin):
+            raise ValueError(f"missing left bin coverage of old distribution: (new_vmin > old_vmin), ({new_vmin} > {old_vmin})")
+        if not (old_vmax <= new_vmax):
+            raise ValueError(f"missing right bin coverage of old distribution: (old_vmax > new_vmax), ({old_vmax} > {new_vmax})")
+
+        old_left_atom_padding = []
+        while (new_vmin < old_vmin):
+            old_vmin -= self.atom_stride
+            old_left_atom_padding.insert(0, old_vmin)
+        old_left_atom_padding = np.array(old_left_atom_padding)
+
+        old_right_atom_padding = []
+        while (old_vmax < new_vmax):
+            old_vmax += self.atom_stride
+            old_right_atom_padding.append(old_vmax)
+        old_right_atom_padding = np.array(old_left_atom_padding)
+
+        old_atoms = np.concatenate([
+            old_left_atom_padding,
+            old_atoms,
+            old_right_atom_padding,
+        ], axis=0)
+        old_probs = np.concatenate([
+            np.zeros_like(old_left_atom_padding),
+            self.probs,
+            np.zeros_like(old_right_atom_padding),
+        ], axis=0)
+
+        new_atoms = np.arange(new_num_atoms) * new_atom_stride + new_vmin + new_atom_stride/2
+        new_probs = np.zeros(dtype=self.probs.dtype, shape=[new_num_atoms])
+        j = 0
+        for i in range(0, self.new_num_atoms):
+            old_left = old_atoms[j] - self.atom_stride / 2
+            old_right = old_atoms[j] + self.atom_stride / 2
+            new_left = new_atoms[i] - new_atom_stride / 2
+            new_right = new_atoms[i] + new_atom_stride / 2
+            assert old_left <= new_left <= new_right, f"got (old_left, new_left, new_right) == ({old_left}, {new_left}, {new_right})"
+            if new_right <= old_right:
+                frac = (new_right - new_left) / self.atom_stride
+                new_probs[i] += frac * old_probs[j]
+            else:
+                frac = (old_right - new_left) / self.atom_stride
+                new_probs[i] += frac * old_probs[j]
+                while (new_right > old_right):
+                    frac = (new_right - old_right) / self.atom_stride
+                    new_probs[i] += frac * (old_probs[j+1] if j+1 < old_probs.shape[0] else 0.0)
+                    j += 1
+                    old_left = old_atoms[j] - self.atom_stride / 2
+                    old_right = old_atoms[j] + self.atom_stride / 2
+
     # todo: redo this
-    def rebin(self, num_atoms: int, new_vmin: float, new_vmax: float) -> 'Histogram':
+    def rebin_old(self, num_atoms: int, new_vmin: float, new_vmax: float) -> 'Histogram':
         old_atoms = self.atoms
         old_vmin = old_atoms[0] - self.atom_stride / 2
         old_vmax = old_atoms[-1] + self.atom_stride / 2
