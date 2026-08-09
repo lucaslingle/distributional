@@ -3,7 +3,24 @@ import matplotlib.pyplot as plt
 from typing import Union
 
 class Histogram:
-    def __init__(self, vmin: float, vmax: float, num_atoms: int, probs: np.ndarray) -> None:
+    def __init__(
+        self, 
+        vmin: Union[int, float], 
+        vmax: Union[int, float], 
+        num_atoms: int, 
+        probs: np.ndarray,
+    ) -> None:
+        if not isinstance(vmin, int) and not isinstance(vmin, float):
+            raise TypeError("input 'vmin' must be int or float type.")
+        if not isinstance(vmax, int) and not isinstance(vmax, float):
+            raise TypeError("input 'vmin' must be int or float type.")
+        if not isinstance(num_atoms, int):
+            raise TypeError("input 'num_atoms' must be int type.")
+        if not isinstance(probs, np.ndarray):
+            raise TypeError("input 'probs' must be numpy.ndarray type.")
+        if len(probs.shape) != 1 or probs.shape[0] != num_atoms:
+            raise ValueError("input 'probs' must be of shape (num_atoms,).")
+        
         self.vmin = vmin
         self.vmax = vmax
         self.num_atoms = num_atoms
@@ -27,7 +44,9 @@ class Histogram:
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
     
-    def __mul__(self: 'Histogram', coef: float) -> 'Histogram':
+    def __mul__(self: 'Histogram', coef: Union[int, float]) -> 'Histogram':
+        if not isinstance(coef, int) and not isinstance(coef, float):
+            raise TypeError("input 'coef' must be int or float type.")
         return Histogram(
             vmin=coef * self.vmin,
             vmax=coef * self.vmax,
@@ -35,7 +54,9 @@ class Histogram:
             probs=np.copy(self.probs),
         )
 
-    def _shift(self: 'Histogram', shift: float) -> 'Histogram':
+    def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
+        if not isinstance(shift, int) and not isinstance(shift, float):
+            raise TypeError("input 'shift' must be int or float type.")
         return Histogram(
             vmin=shift + self.vmin,
             vmax=shift + self.vmax,
@@ -53,10 +74,14 @@ class Histogram:
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
-        assert isinstance(other, Histogram)
-        assert self.vmin == other.vmin
-        assert self.vmax == other.vmax
-        assert self.num_atoms == other.num_atoms
+        if not isinstance(other, Histogram):
+            raise TypeError("input 'other' must be Histogram type.")
+        if self.vmin != other.vmin:
+            raise ValueError("other.vmin must equal self.vmin")
+        if self.vmax != other.vmax:
+            raise ValueError("other.vmax must equal self.vmax")
+        if self.num_atoms != other.num_atoms:
+            raise ValueError("other.num_atoms must equal self.num_atoms")
 
         conv_size = 2 * self.num_atoms - 1
         fx = np.fft.rfft(self.probs, n=conv_size)
@@ -70,10 +95,14 @@ class Histogram:
         )
 
     def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
-        assert isinstance(other, Histogram)
-        assert self.vmin == other.vmin
-        assert self.vmax == other.vmax
-        assert self.num_atoms == other.num_atoms
+        if not isinstance(other, Histogram):
+            raise TypeError("input 'other' must be Histogram type.")
+        if self.vmin != other.vmin:
+            raise ValueError("other.vmin must equal self.vmin")
+        if self.vmax != other.vmax:
+            raise ValueError("other.vmax must equal self.vmax")
+        if self.num_atoms != other.num_atoms:
+            raise ValueError("other.num_atoms must equal self.num_atoms")
 
         probs = np.zeros(dtype=self.probs.dtype, shape=[2 * self.num_atoms - 1])
         for i in range(0, len(self.atoms)):
