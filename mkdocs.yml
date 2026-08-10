@@ -1,0 +1,11 @@
+site_name: Distributional Docs
+
+theme:
+  name: mkdocs
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
