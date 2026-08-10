@@ -1,5 +1,5 @@
 # distributional
-A library for histogram arithmetic.
+A library for histogram arithmetic
 
 ### getting started
 To install from github, clone this repo and run

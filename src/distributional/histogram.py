@@ -129,7 +129,7 @@ class Histogram:
         )
 
     def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
-        """Adds a scalar or another random variable to the current histogram's random variable. 
+        """Adds a scalar or an independent random variable to the current histogram's random variable. 
 
         Args:
             other: An int, float, or Histogram instance.
