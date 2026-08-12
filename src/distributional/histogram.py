@@ -214,10 +214,10 @@ class Histogram:
         old_left_atom_padding = []
         while (new_vmin < old_vmin):
             old_vmin -= self.atom_stride
-            old_left_atom_padding.insert(0, old_vmin)
+            old_left_atom_padding.insert(0, old_vmin + self.atom_stride / 2)
         # extra one mandatory padding
         old_vmin -= self.atom_stride
-        old_left_atom_padding.insert(0, old_vmin)
+        old_left_atom_padding.insert(0, old_vmin + self.atom_stride / 2)
         old_left_atom_padding = np.array(old_left_atom_padding)
 
         # pad old distribution with right atoms of zero probability mass
@@ -225,10 +225,10 @@ class Histogram:
         old_right_atom_padding = []
         while (old_vmax < new_vmax):
             old_vmax += self.atom_stride
-            old_right_atom_padding.append(old_vmax)
+            old_right_atom_padding.append(old_vmax - self.atom_stride / 2)
         # extra one mandatory padding
         old_vmax += self.atom_stride
-        old_right_atom_padding.append(old_vmax)
+        old_right_atom_padding.append(old_vmax - self.atom_stride / 2)
         old_right_atom_padding = np.array(old_right_atom_padding)
 
         old_atoms = np.concatenate([
