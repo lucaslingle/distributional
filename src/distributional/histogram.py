@@ -33,7 +33,7 @@ class Histogram:
         if not isinstance(vmin, int) and not isinstance(vmin, float):
             raise TypeError("input 'vmin' must be int or float type.")
         if not isinstance(vmax, int) and not isinstance(vmax, float):
-            raise TypeError("input 'vmin' must be int or float type.")
+            raise TypeError("input 'vmax' must be int or float type.")
         if not isinstance(num_atoms, int):
             raise TypeError("input 'num_atoms' must be int type.")
         if not isinstance(probs, np.ndarray):
@@ -163,12 +163,22 @@ class Histogram:
         """
         if not isinstance(coef, int) and not isinstance(coef, float):
             raise TypeError("input 'coef' must be int or float type.")
-        return Histogram(
-            vmin=coef * self.vmin,
-            vmax=coef * self.vmax,
-            num_atoms=self.num_atoms,
-            probs=np.copy(self.probs),
-        )
+        if coef >= 0:
+            # multiply bins and atoms if coef >= 0
+            return Histogram(
+                vmin=coef * self.vmin,
+                vmax=coef * self.vmax,
+                num_atoms=self.num_atoms,
+                probs=np.copy(self.probs),
+            )
+        else:
+            # also, flip vmin and vmax if coef < 0
+            return Histogram(
+                vmin=coef * self.vmax,
+                vmax=coef * self.vmin,
+                num_atoms=self.num_atoms,
+                probs=np.copy(self.probs),
+            )
 
     def plot(self) -> None:
         """Plot the histogram using matplotlib.
