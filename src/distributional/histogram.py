@@ -163,22 +163,12 @@ class Histogram:
         """
         if not isinstance(coef, int) and not isinstance(coef, float):
             raise TypeError("input 'coef' must be int or float type.")
-        if coef >= 0:
-            # multiply bins and atoms if coef >= 0
-            return Histogram(
-                vmin=coef * self.vmin,
-                vmax=coef * self.vmax,
-                num_atoms=self.num_atoms,
-                probs=np.copy(self.probs),
-            )
-        else:
-            # also, flip vmin and vmax if coef < 0
-            return Histogram(
-                vmin=coef * self.vmax,
-                vmax=coef * self.vmin,
-                num_atoms=self.num_atoms,
-                probs=np.copy(self.probs),
-            )
+        return Histogram(
+            vmin=min(coef * self.vmin, coef * self.vmax),
+            vmax=max(coef * self.vmin, coef * self.vmax),
+            num_atoms=self.num_atoms,
+            probs=np.copy(self.probs),
+        )
 
     def plot(self) -> None:
         """Plot the histogram using matplotlib.
