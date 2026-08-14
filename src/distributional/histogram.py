@@ -75,6 +75,12 @@ class Histogram:
         output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
+
+    @staticmethod
+    def _clean(probs: np.ndarray) -> np.ndarray:
+        probs = np.maximum(0., probs)
+        probs /= np.sum(probs, axis=-1)
+        return probs
     
     def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
@@ -104,7 +110,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=probs,
+            probs=Histogram._clean(probs),
         )
 
     def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
@@ -125,7 +131,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=probs,
+            probs=Histogram._clean(probs),
         )
 
     def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
@@ -281,5 +287,5 @@ class Histogram:
             vmin=new_vmin,
             vmax=new_vmax,
             num_atoms=new_num_atoms,
-            probs=new_probs,
+            probs=Histogram._clean(new_probs),
         )
