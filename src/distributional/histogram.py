@@ -271,12 +271,12 @@ class Histogram:
         )
 
     def pad(self, left: float, right: float, extra: bool = False) -> 'Histogram':
-        """Pad the bins of the histogram until their outer edges exceed the range given.
+        """Pad the histogram with zero-mass bins until the outer edges exceed the range given.
 
         Args:
-            left: Left pad target for the histogram's random variable.
-            right: Right pad target for the histogram's random variable.
-            extra: Add one extra atom to each side of the new histogram, 
+            left: Left pad target.
+            right: Right pad target. 
+            extra: Adds one extra atom to each side of the new histogram, 
                 beyond what is needed to cover the range specified. Defaults to False.
         
         Returns:
@@ -341,7 +341,7 @@ class Histogram:
         )
 
     def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
-        """Rebin the histogram so that the probability mass of each old bin 
+        """Rebin the histogram. Implemented so that the probability mass of each old bin 
         is shared according to the proportion of its intersection with each new bin.
 
         Args:
