@@ -28,12 +28,145 @@ def alt_histogram(n, consec=1, **kwargs):
     return Histogram(0., 1., n, alt_probs(n, consec))
 
 
+def test_init_guard_clauses():
+    with pytest.raises(TypeError):
+        Histogram(vmin="str", vmax=1., num_atoms=10, probs=unif_probs(10))
+    with pytest.raises(TypeError):
+        Histogram(vmin=0., vmax="str", num_atoms=10, probs=unif_probs(10))
+    with pytest.raises(TypeError):
+        Histogram(vmin=0., vmax=1., num_atoms="str", probs=unif_probs(10))
+    with pytest.raises(TypeError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs="str")
+    with pytest.raises(TypeError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs=[0.1 for _ in range(10)])
+    with pytest.raises(ValueError):
+        Histogram(vmin=1., vmax=0., num_atoms=10, probs=unif_probs(10))
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=0, probs=unif_probs(10))
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=-1, probs=unif_probs(10))
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs=np.array([0.1 for _ in range(10)])[None, ...])
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs=np.array([0.1 for _ in range(11)]))
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs=np.array([-0.1 for _ in range(10)]))
+    with pytest.raises(ValueError):
+        Histogram(vmin=0., vmax=1., num_atoms=10, probs=np.array([0.05 for _ in range(10)]))
+
+
+def test_shift_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10)._shift(shift="str")
+    with pytest.raises(TypeError):
+        unif_histogram(10)._shift(shift=unif_histogram(10))
+
+
+def test_convolve_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve(other="str")
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve(other=1)
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve(other=1.0)
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve(Histogram(-1., 1., 10, unif_probs(10)))
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve(Histogram(0., 2., 10, unif_probs(10)))
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve(Histogram(0., 1., 11, unif_probs(11)))
+
+
+def test_convolve_slow_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve_slow(other="str")
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve_slow(other=1)
+    with pytest.raises(TypeError):
+        unif_histogram(10)._convolve_slow(other=1.0)
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve_slow(Histogram(-1., 1., 10, unif_probs(10)))
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve_slow(Histogram(0., 2., 10, unif_probs(10)))
+    with pytest.raises(ValueError):
+        Histogram(0., 1., 10, unif_probs(10))._convolve_slow(Histogram(0., 1., 11, unif_probs(11)))
+
+
+def test_add_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10) + "str"
+    with pytest.raises(TypeError):
+        unif_histogram(10) + [0.1 for _ in range(10)]
+
+
+def test_mul_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10) * "str"
+    with pytest.raises(TypeError):
+        unif_histogram(10) + [0.1 for _ in range(10)]
+    with pytest.raises(TypeError):
+        unif_histogram(10) * unif_histogram(10)
+
+
+def test_pad_guard_clauses():
+    with pytest.raises(ValueError):
+        unif_histogram(10).pad(2.0, -2.0)
+    with pytest.raises(ValueError):
+        unif_histogram(10).pad(0.5, 1.0)
+    with pytest.raises(ValueError):
+        unif_histogram(10).pad(0.0, 0.5)
+
+
+def test_renormalize_guard_clauses():
+    with pytest.raises(ValueError):
+        Histogram.renormalize(unif_histogram(10).probs * -1)
+
+
+def test_shift_return():
+    assert type(unif_histogram(10)._shift(1)) == Histogram
+    assert type(unif_histogram(10)._shift(1.)) == Histogram
+
+
+def test_add_return():
+    assert type(unif_histogram(10) + 1) == Histogram
+    assert type(unif_histogram(10) + 1.) == Histogram
+    assert type(unif_histogram(10) + unif_histogram(10)) == Histogram
+
+
+def test_mul_return():
+    assert type(unif_histogram(10) * 2) == Histogram
+    assert type(unif_histogram(10) * 2.) == Histogram
+
+
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
-def test_histogram_convolve_rel_test(hist):
-    h = hist(6)
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_histogram_convolve_rel_test(hist, n):
+    h = hist(n)
     hc = h._convolve(h)
     hcs = h._convolve_slow(h)
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
+
+
+@pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_pad(hist, n):
+    h = hist(n)
+
+    hp = h.pad(-1., 1.)
+    np.testing.assert_allclose(hp.probs[-n:], h.probs)
+    np.testing.assert_allclose(hp.probs[:-n], 0.0)
+
+    hp = h.pad(-1., 1., extra=True)
+    np.testing.assert_allclose(hp.probs[-(n+1):-1], h.probs)
+    np.testing.assert_allclose(hp.probs[:-(n+1)], 0.0)
+
+    hp = h.pad(0., 2.)
+    np.testing.assert_allclose(hp.probs[:n], h.probs)
+    np.testing.assert_allclose(hp.probs[n:], 0.0)
+
+    hp = h.pad(0., 2., extra=True)
+    np.testing.assert_allclose(hp.probs[1:(n+1)], h.probs)
+    np.testing.assert_allclose(hp.probs[(n+1):], 0.0)
 
 
 @pytest.mark.parametrize("hist, probs", [(unif_histogram, unif_probs)])
