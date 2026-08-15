@@ -7,4 +7,4 @@ A library for histogram arithmetic.
 ::: distributional.histogram
     options:
       show_root_heading: true
-      members_order: source
+      members_order: alphabetical

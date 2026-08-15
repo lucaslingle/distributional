@@ -122,6 +122,16 @@ def test_renormalize_guard_clauses():
         Histogram.renormalize(unif_histogram(10).probs * -1)
 
 
+def test_expectation_return():
+    h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
+    np.testing.assert_allclose(h.expectation, 0.0)
+
+
+def test_variance_return():
+    h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
+    np.testing.assert_allclose(h.variance, 1.0)
+
+
 def test_shift_return():
     assert type(unif_histogram(10)._shift(1)) == Histogram
     assert type(unif_histogram(10)._shift(1.)) == Histogram
@@ -145,6 +155,26 @@ def test_histogram_convolve_rel_test(hist, n):
     hc = h._convolve(h)
     hcs = h._convolve_slow(h)
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
+
+
+def test_histogram_condition():
+    h = unif_histogram(2)
+    hc1 = h.condition(-float('inf'), 0.5)
+    np.testing.assert_allclose(hc1.probs, np.array([1.0, 0.0]), **TOLS)
+    hc2 = h.condition(0.5, float('inf'))
+    np.testing.assert_allclose(hc2.probs, np.array([0.0, 1.0]), **TOLS)
+
+    h = unif_histogram(3)
+    hc1 = h.condition(-float('inf'), 0.5)
+    np.testing.assert_allclose(hc1.probs, np.array([2/3, 1/3, 0/3]), **TOLS)
+    hc2 = h.condition(0.5, float('inf'))
+    np.testing.assert_allclose(hc2.probs, np.array([0/3, 1/3, 2/3]), **TOLS)
+
+    h = unif_histogram(4)
+    hc1 = h.condition(0.25, 0.75)
+    np.testing.assert_allclose(hc1.probs, np.array([0/4, 2/4, 2/4, 0/4]), **TOLS)
+    hc2 = h.condition(0.125, 0.875)
+    np.testing.assert_allclose(hc2.probs, np.array([1/6, 2/6, 2/6, 1/6]), **TOLS)
 
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
