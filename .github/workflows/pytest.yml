@@ -1,4 +1,4 @@
-yamlname: Run Pytest
+name: Run Pytest
 
 on:
   push:
