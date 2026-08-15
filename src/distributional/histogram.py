@@ -1,7 +1,8 @@
+import logging
+from typing import Union
+
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Union
-import logging
 
 class Histogram:
     def __init__(
@@ -17,6 +18,7 @@ class Histogram:
             vmin: Minimum permitted value for the histogram's random variable.
             vmax: Maximum permitted value for the histogram's random variable.
             num_atoms: Number of bins for the histogram.
+            probs: Probabilities for the bins in the histogram.
 
         Returns:
             A new Histogram instance representing the distribution of the new variable.
@@ -26,6 +28,8 @@ class Histogram:
             TypeError: If vmax is not an int or float.
             TypeError: If num_atoms is not an int. 
             TypeError: If probs is not a numpy.ndarray.
+            ValueError: If vmin >= vmax.
+            ValueError: If num_atoms <= 0.
             ValueError: If probs.shape is not equal to (num_atoms,).
             ValueError: If probs contains negative values.
             ValueError: If probs does not sum to one.  
@@ -38,6 +42,10 @@ class Histogram:
             raise TypeError("input 'num_atoms' must be int type.")
         if not isinstance(probs, np.ndarray):
             raise TypeError("input 'probs' must be numpy.ndarray type.")
+        if vmin >= vmax:
+            raise ValueError("input 'vmin' must be less than 'vmax'.")
+        if num_atoms <= 0:
+            raise ValueError("input 'num_atoms' must be positive.")
         if len(probs.shape) != 1 or probs.shape[0] != num_atoms:
             raise ValueError("input 'probs' must be of shape (num_atoms,).")
         if not np.allclose(probs, np.abs(probs)):
@@ -45,42 +53,60 @@ class Histogram:
         if not np.allclose(np.sum(probs), 1.0):
             raise ValueError("input 'probs' must sum to one.")
         
-        self.vmin = vmin
-        self.vmax = vmax
-        self.num_atoms = num_atoms
-        self.probs = probs
+        self._vmin = vmin
+        self._vmax = vmax
+        self._num_atoms = num_atoms
+        self._probs = probs
+
+    @property
+    def vmin(self):
+        """float: Minimum permitted value for the histogram's random variable.
+        """
+        return self._vmin
+
+    @property
+    def vmax(self):
+        """float: Maximum permitted value for the histogram's random variable.
+        """
+        return self._vmax
+
+    @property
+    def num_atoms(self):
+        """int: Number of bins for the histogram.
+        """
+        return self._num_atoms
+
+    @property
+    def probs(self):
+        """numpy.ndarray: A copy of the probabilities for the bins in the histogram.
+        """
+        return np.copy(self._probs)
 
     @property
     def atom_stride(self) -> float:
-        """float: the histogram bin width.
+        """float: The histogram bin width.
         """
         return (self.vmax - self.vmin) / self.num_atoms  # num atoms = num bins
     
     @property
     def atom_min(self) -> float:
-        """float: the center of the leftmost histogram bin.
+        """float: The center of the leftmost histogram bin.
         """
         return self.vmin + self.atom_stride / 2
     
     @property
     def atom_max(self) -> float:
-        """float: the center of the rightmost histogram bin.
+        """float: The center of the rightmost histogram bin.
         """
         return self.vmax - self.atom_stride / 2
     
     @property
     def atoms(self) -> np.ndarray:
-        """numpy.ndarray: the centers for the histogram bins.
+        """numpy.ndarray: The centers for the histogram bins.
         """
         output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
-
-    @staticmethod
-    def _clean(probs: np.ndarray) -> np.ndarray:
-        probs = np.maximum(0., probs)
-        probs /= np.sum(probs, axis=-1)
-        return probs
     
     def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
@@ -89,7 +115,7 @@ class Histogram:
             vmin=shift + self.vmin,
             vmax=shift + self.vmax,
             num_atoms=self.num_atoms,
-            probs=np.copy(self.probs),
+            probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
     def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
@@ -110,7 +136,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram._clean(probs),
+            probs=Histogram.renormalize(probs),
         )
 
     def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
@@ -131,7 +157,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram._clean(probs),
+            probs=Histogram.renormalize(probs),
         )
 
     def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
@@ -173,7 +199,7 @@ class Histogram:
             vmin=min(coef * self.vmin, coef * self.vmax),
             vmax=max(coef * self.vmin, coef * self.vmax),
             num_atoms=self.num_atoms,
-            probs=np.copy(self.probs),
+            probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
     def plot(self) -> None:
@@ -187,6 +213,76 @@ class Histogram:
             align="center"
         )
         plt.show()
+
+    def pad(self, new_vmin, new_vmax, extra=False):
+        """Pad the bins of the histogram until their outer edges exceed the range given.
+
+        Args:
+            new_vmin: Left pad target for the histogram's random variable.
+            new_vmax: Right pad target for the histogram's random variable.
+            extra: Add one extra atom to each side of the new histogram, 
+                beyond what is needed to cover the range specified. Defaults to False.
+        
+        Returns:
+            New histogram whose atoms minimally contain the range [new_vmin, new_vmax].
+        
+        Raises:
+            ValueError: If vmin >= vmax.
+            ValueError: If self.vmin > new_vmin.
+            ValueError: If new_vmax < self.vmax.
+        """
+        if new_vmin >= new_vmax:
+            raise ValueError("input 'new_vmin' must be less than 'new_vmax'.")
+        if self.vmin < new_vmin:
+            raise ValueError(f"missing left bin coverage of old distribution: (old_vmin < new_vmin), ({self.vmin} < {new_vmin})")
+        if new_vmax < self.vmax:
+            raise ValueError(f"missing right bin coverage of old distribution: (new_vmax < old_vmax), ({new_vmax} < {self.vmax})")
+
+        atoms = self.atoms
+        vmin = self.vmin
+        vmax = self.vmax
+
+        # pad old distribution with left atoms of zero probability mass
+        # until old bins exceed left range of new ones
+        left_atom_padding = []
+        while (new_vmin < vmin):
+            vmin -= self.atom_stride
+            left_atom_padding.insert(0, vmin + self.atom_stride / 2)
+        if extra:
+            # extra padding
+            vmin -= self.atom_stride
+            left_atom_padding.insert(0, vmin + self.atom_stride / 2)
+        left_atom_padding = np.array(left_atom_padding)
+
+        # pad old distribution with right atoms of zero probability mass
+        # until old bins exceed right range of new ones
+        right_atom_padding = []
+        while (vmax < new_vmax):
+            vmax += self.atom_stride
+            right_atom_padding.append(vmax - self.atom_stride / 2)
+        if extra:
+            # extra padding
+            vmax += self.atom_stride
+            right_atom_padding.append(vmax - self.atom_stride / 2)
+        right_atom_padding = np.array(right_atom_padding)
+
+        atoms = np.concatenate([
+            left_atom_padding,
+            atoms,
+            right_atom_padding,
+        ], axis=0)
+        probs = np.concatenate([
+            np.zeros_like(left_atom_padding),
+            self.probs,
+            np.zeros_like(right_atom_padding),
+        ], axis=0)
+
+        return Histogram(
+            vmin=vmin,
+            vmax=vmax,
+            num_atoms=atoms.shape[0],
+            probs=probs,
+        )
 
     def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
         """Rebin the histogram so that the probability mass of each old bin 
@@ -206,49 +302,12 @@ class Histogram:
             RuntimeError: If the algorithm does not function as expected. 
                 This should never occur.
         """
-        old_atoms = self.atoms
-        old_vmin = self.vmin
-        old_vmax = self.vmax
-        new_atom_stride = (new_vmax - new_vmin) / new_num_atoms
-        if not (new_vmin <= old_vmin):
-            raise ValueError(f"missing left bin coverage of old distribution: (new_vmin > old_vmin), ({new_vmin} > {old_vmin})")
-        if not (old_vmax <= new_vmax):
-            raise ValueError(f"missing right bin coverage of old distribution: (old_vmax > new_vmax), ({old_vmax} > {new_vmax})")
-
-        # pad old distribution with left atoms of zero probability mass
-        # until old bins exceed left range of new ones
-        old_left_atom_padding = []
-        while (new_vmin < old_vmin):
-            old_vmin -= self.atom_stride
-            old_left_atom_padding.insert(0, old_vmin + self.atom_stride / 2)
-        # extra one mandatory padding
-        old_vmin -= self.atom_stride
-        old_left_atom_padding.insert(0, old_vmin + self.atom_stride / 2)
-        old_left_atom_padding = np.array(old_left_atom_padding)
-
-        # pad old distribution with right atoms of zero probability mass
-        # until old bins exceed right range of new ones
-        old_right_atom_padding = []
-        while (old_vmax < new_vmax):
-            old_vmax += self.atom_stride
-            old_right_atom_padding.append(old_vmax - self.atom_stride / 2)
-        # extra one mandatory padding
-        old_vmax += self.atom_stride
-        old_right_atom_padding.append(old_vmax - self.atom_stride / 2)
-        old_right_atom_padding = np.array(old_right_atom_padding)
-
-        old_atoms = np.concatenate([
-            old_left_atom_padding,
-            old_atoms,
-            old_right_atom_padding,
-        ], axis=0)
-        old_probs = np.concatenate([
-            np.zeros_like(old_left_atom_padding),
-            self.probs,
-            np.zeros_like(old_right_atom_padding),
-        ], axis=0)
+        old_padded = self.pad(new_vmin, new_vmax, extra=True)
+        old_atoms = old_padded.atoms
+        old_probs = old_padded.probs
 
         # loop over new bins, figure out how much old probability mass they intersect with
+        new_atom_stride = (new_vmax - new_vmin) / new_num_atoms
         new_atoms = np.arange(new_num_atoms) * new_atom_stride + new_vmin + new_atom_stride/2
         new_probs = np.zeros(dtype=self.probs.dtype, shape=[new_num_atoms])
         j = 0
@@ -287,5 +346,25 @@ class Histogram:
             vmin=new_vmin,
             vmax=new_vmax,
             num_atoms=new_num_atoms,
-            probs=Histogram._clean(new_probs),
+            probs=Histogram.renormalize(new_probs),
         )
+
+    @staticmethod
+    def renormalize(probs: np.ndarray) -> np.ndarray:
+        """Rectifies the inputted probabilities and renormalizes to unit sum,
+        counteracting small numerical errors.
+        
+        Args:
+            probs: A numpy.ndarray containing the probabilities to renormalize.
+
+        Returns:
+            numpy.ndarray containing the renormalized probabilities.
+
+        Raises:
+            ValueError: If the rectified probabilities sum to zero. 
+        """
+        probs = np.maximum(0., probs)
+        if np.allclose(np.sum(probs), 0.0):
+            raise ValueError("Rectified probabilities sum to zero.")
+        probs /= np.sum(probs, axis=-1)
+        return probs

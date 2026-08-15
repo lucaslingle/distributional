@@ -7,8 +7,10 @@ A library for histogram arithmetic
 ### getting started
 To install from github, clone this repo and run
 ```
-pip install -r requirements.txt
+pip install .
 ```
+
+For unit testing and docs dependencies, replace ```.``` with ```'.[test]'```, ```'.[docs]```, or ```'.[test,docs]'```. 
 
 ### documentation
 To read the documentation, you can run
