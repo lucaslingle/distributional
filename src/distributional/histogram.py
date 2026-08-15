@@ -75,12 +75,6 @@ class Histogram:
         output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
-
-    @staticmethod
-    def _clean(probs: np.ndarray) -> np.ndarray:
-        probs = np.maximum(0., probs)
-        probs /= np.sum(probs, axis=-1)
-        return probs
     
     def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
@@ -110,7 +104,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram._clean(probs),
+            probs=Histogram.renormalize(probs),
         )
 
     def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
@@ -131,7 +125,7 @@ class Histogram:
             vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram._clean(probs),
+            probs=Histogram.renormalize(probs),
         )
 
     def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
@@ -287,5 +281,25 @@ class Histogram:
             vmin=new_vmin,
             vmax=new_vmax,
             num_atoms=new_num_atoms,
-            probs=Histogram._clean(new_probs),
+            probs=Histogram.renormalize(new_probs),
         )
+
+    @staticmethod
+    def renormalize(probs: np.ndarray) -> np.ndarray:
+        """Rectifies the inputted probabilities and renormalizes to unit sum,
+        counteracting small numerical errors.
+        
+        Args:
+            probs: A numpy.ndarray containing the probabilities to renormalize.
+
+        Returns:
+            numpy.ndarray containing the renormalized probabilities.
+
+        Raises:
+            ValueError: If the rectified probabilities sum to zero. 
+        """
+        probs = np.maximum(0., probs)
+        if np.allclose(np.sum(probs), 0.0):
+            raise ValueError("Rectified probabilities sum to zero.")
+        probs /= np.sum(probs, axis=-1)
+        return probs

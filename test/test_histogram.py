@@ -15,7 +15,7 @@ def alt_probs(n, consec=1, **kwargs):
     assert consec >= 0
     if consec > 0:
         mass = np.array([(1. if (i // consec) % 2 == 0 else 0.) for i in range(n)])
-        return Histogram._clean(mass)
+        return Histogram.renormalize(mass)
     else:
         return unif_probs(n)
 
@@ -36,35 +36,35 @@ def test_histogram_convolve_rel_test(hist):
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
 
 
-@pytest.mark.parametrize("probs, hist", [(unif_probs, unif_histogram)])
+@pytest.mark.parametrize("hist, probs", [(unif_histogram, unif_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(2, 3), (3, 2)])
-def test_histogram_rebin_unaligned_unif(probs, hist, start_n, end_n):
+def test_histogram_rebin_unaligned_unif(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0., 1., end_n)
-    np.testing.assert_allclose(probs(end_n), h.probs, **TOLS)
+    np.testing.assert_allclose(h.probs, probs(end_n), **TOLS)
 
 
 def test_histogram_rebin_unaligned_alt():
     h = alt_histogram(2)
     h = h.rebin(0., 1., 3)
-    np.testing.assert_allclose(np.array([2/3, 1/3, 0/3]), h.probs, **TOLS)
+    np.testing.assert_allclose(h.probs, np.array([2/3, 1/3, 0/3]), **TOLS)
 
     h = alt_histogram(3)
     h = h.rebin(0., 1., 2)
-    np.testing.assert_allclose(np.array([1/2, 1/2]), h.probs, **TOLS)
+    np.testing.assert_allclose(h.probs, np.array([1/2, 1/2]), **TOLS)
 
 
-@pytest.mark.parametrize("probs, hist", [(unif_probs, unif_histogram)])
+@pytest.mark.parametrize("hist, probs", [(unif_histogram, unif_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(10, 100), (100, 10)])
-def test_histogram_rebin_aligned_unif(probs, hist, start_n, end_n):
+def test_histogram_rebin_aligned_unif(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0., 1., end_n)
-    np.testing.assert_allclose(probs(end_n), h.probs, **TOLS)
+    np.testing.assert_allclose(h.probs, probs(end_n), **TOLS)
 
 
-@pytest.mark.parametrize("probs, hist", [(alt_probs, alt_histogram)])
+@pytest.mark.parametrize("hist, probs", [(alt_histogram, alt_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(10, 20), (10, 100), (20, 10), (100, 10)])
-def test_histogram_rebin_aligned_alt(probs, hist, start_n, end_n):
+def test_histogram_rebin_aligned_alt(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0., 1., end_n)
-    np.testing.assert_allclose(probs(end_n, end_n // start_n), h.probs, **TOLS)
+    np.testing.assert_allclose(h.probs, probs(end_n, end_n // start_n), **TOLS)
