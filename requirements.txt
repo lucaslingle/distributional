@@ -1,7 +1,7 @@
 mkdocs~=1.6.1
 mkdocstrings~=1.0.6
 mkdocstrings-python~=2.0.5
-matplotlib~=3.11.0
+matplotlib~=3.10.0
 seaborn~=0.13.2
 numpy~=2.4.6
 pytest~=9.0.3

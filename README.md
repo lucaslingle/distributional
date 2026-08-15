@@ -1,4 +1,7 @@
 # distributional
+
+[![Tests](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml/badge.svg)](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml)
+
 A library for histogram arithmetic
 
 ### getting started
