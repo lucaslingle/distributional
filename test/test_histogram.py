@@ -108,7 +108,27 @@ def test_mul_guard_clauses():
         unif_histogram(10) * unif_histogram(10)
 
 
+def test_sub_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10) - "str"
+    with pytest.raises(TypeError):
+        unif_histogram(10) - [0.1 for _ in range(10)]
+
+
+def test_condition_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).condition("str", 1.0)
+    with pytest.raises(TypeError):
+        unif_histogram(10).condition(0.0, "str")
+    with pytest.raises(ValueError):
+        unif_histogram(10).condition(2.0, -2.0)
+
+
 def test_pad_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).pad("str", 1.0)
+    with pytest.raises(TypeError):
+        unif_histogram(10).pad(0.0, "str")
     with pytest.raises(ValueError):
         unif_histogram(10).pad(2.0, -2.0)
     with pytest.raises(ValueError):
@@ -120,6 +140,16 @@ def test_pad_guard_clauses():
 def test_renormalize_guard_clauses():
     with pytest.raises(ValueError):
         Histogram.renormalize(unif_histogram(10).probs * -1)
+
+
+def test_expectation_return():
+    h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
+    np.testing.assert_allclose(h.expectation, 0.0)
+
+
+def test_variance_return():
+    h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
+    np.testing.assert_allclose(h.variance, 1.0)
 
 
 def test_shift_return():
@@ -138,6 +168,41 @@ def test_mul_return():
     assert type(unif_histogram(10) * 2.) == Histogram
 
 
+def test_neg_return():
+    h = unif_histogram(10)
+    assert type(-h) == Histogram
+    np.testing.assert_allclose((-h).probs, (h * -1).probs, **TOLS)
+
+
+def test_sub_return():
+    assert type(unif_histogram(10) - 1) == Histogram
+    assert type(unif_histogram(10) - 1.) == Histogram
+
+    h = Histogram(-1., 1., 10, probs=unif_probs(10))
+    assert type(h - h) == Histogram  # these are independent copies of the rv, fyi
+    np.testing.assert_allclose((h - h).probs, (h + h * -1).probs, **TOLS)
+    np.testing.assert_allclose((h - h).probs, (h + -h).probs, **TOLS)
+
+
+def test_radd_return():
+    h = unif_histogram(10)
+    assert type(1 + h) == Histogram
+    np.testing.assert_allclose((1 + h).atoms, (h + 1).atoms)
+
+
+def test_rmul_return():
+    h = unif_histogram(10)
+    assert type(2 * h) == Histogram
+    np.testing.assert_allclose((2 * h).atoms, (h * 2).atoms)
+
+
+def test_rsub_return():
+    h = unif_histogram(10)
+    assert type(1 - h) == Histogram
+    np.testing.assert_allclose((1 - h).atoms, (-h + 1).atoms)
+    np.testing.assert_allclose((1 - h).atoms, (-1 * h + 1).atoms)
+
+
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
 def test_histogram_convolve_rel_test(hist, n):
@@ -145,6 +210,26 @@ def test_histogram_convolve_rel_test(hist, n):
     hc = h._convolve(h)
     hcs = h._convolve_slow(h)
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
+
+
+def test_histogram_condition():
+    h = unif_histogram(2)
+    hc1 = h.condition(-float('inf'), 0.5)
+    np.testing.assert_allclose(hc1.probs, np.array([1.0, 0.0]), **TOLS)
+    hc2 = h.condition(0.5, float('inf'))
+    np.testing.assert_allclose(hc2.probs, np.array([0.0, 1.0]), **TOLS)
+
+    h = unif_histogram(3)
+    hc1 = h.condition(-float('inf'), 0.5)
+    np.testing.assert_allclose(hc1.probs, np.array([2/3, 1/3, 0/3]), **TOLS)
+    hc2 = h.condition(0.5, float('inf'))
+    np.testing.assert_allclose(hc2.probs, np.array([0/3, 1/3, 2/3]), **TOLS)
+
+    h = unif_histogram(4)
+    hc1 = h.condition(0.25, 0.75)
+    np.testing.assert_allclose(hc1.probs, np.array([0/4, 2/4, 2/4, 0/4]), **TOLS)
+    hc2 = h.condition(0.125, 0.875)
+    np.testing.assert_allclose(hc2.probs, np.array([1/6, 2/6, 2/6, 1/6]), **TOLS)
 
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])

@@ -107,8 +107,21 @@ class Histogram:
         output = np.arange(self.num_atoms) * self.atom_stride + self.atom_min
         np.testing.assert_allclose(output[-1], self.atom_max)
         return output
+
+    @property
+    def expectation(self) -> float:
+        """float: The expectation (mean) of the histogram.
+        """
+        return np.sum(self.atoms * self.probs, axis=-1)
+
+    @property
+    def variance(self) -> float:
+        """float: The variance of the histogram.
+        """
+        mu = self.expectation
+        return np.sum(np.square(self.atoms - mu) * self.probs, axis=-1)
     
-    def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
+    def _shift(self, shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
             raise TypeError("input 'shift' must be int or float type.")
         return Histogram(
@@ -118,7 +131,7 @@ class Histogram:
             probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
-    def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+    def _convolve(self, other: 'Histogram') -> 'Histogram':
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
         if self.vmin != other.vmin:
@@ -139,7 +152,7 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+    def _convolve_slow(self, other: 'Histogram') -> 'Histogram':
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
         if self.vmin != other.vmin:
@@ -160,7 +173,7 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def __add__(self: 'Histogram', other: Union['Histogram', float, int]) -> 'Histogram':
+    def __add__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
         """Adds a scalar or an independent random variable to the current histogram's random variable. 
 
         Args:
@@ -181,11 +194,11 @@ class Histogram:
             return self._convolve(other)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
-    def __mul__(self: 'Histogram', coef: Union[int, float]) -> 'Histogram':
+    def __mul__(self, other: Union[int, float]) -> 'Histogram':
         """Multiplies the current histogram's random variable by a scalar. 
 
         Args:
-            coef: An int or float.
+            other: An int or float.
 
         Returns:
             A new Histogram instance representing the distribution of the new variable.
@@ -193,14 +206,88 @@ class Histogram:
         Raises:
             TypeError: If other is not an int or float.
         """
-        if not isinstance(coef, int) and not isinstance(coef, float):
+        if not isinstance(other, int) and not isinstance(other, float):
             raise TypeError("input 'coef' must be int or float type.")
         return Histogram(
-            vmin=min(coef * self.vmin, coef * self.vmax),
-            vmax=max(coef * self.vmin, coef * self.vmax),
+            vmin=min(other * self.vmin, other * self.vmax),
+            vmax=max(other * self.vmin, other * self.vmax),
             num_atoms=self.num_atoms,
             probs=self.probs,  # probs is already a deep copy of self._probs
         )
+
+    def __neg__(self) -> 'Histogram':
+        """
+        Negation of the histogram's random variable.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+        """
+        return self * -1
+
+    def __sub__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Subtracts a scalar or an independent random variable from the current histogram's random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        if isinstance(other, int):
+            return self._shift(-float(other))
+        if isinstance(other, float):
+            return self._shift(-other)
+        if isinstance(other, Histogram):
+            return self._convolve(-other)
+        raise TypeError("input 'other' must be int, float, or Histogram type.")
+
+    def __radd__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Adds a scalar or an independent random variable to the current histogram's random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        return self.__add__(other)
+
+    def __rmul__(self, other: Union[int, float]) -> 'Histogram':
+        """Multiplies the current histogram's random variable by a scalar. 
+
+        Args:
+            other: An int or float.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int or float.
+        """
+        return self.__mul__(other)
+
+    def __rsub__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Subtracts the current histogram's random variable from a scalar or an independent random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance to be subtracted from.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        return -self.__sub__(other)
 
     def plot(self) -> None:
         """Plot the histogram using matplotlib.
@@ -214,29 +301,76 @@ class Histogram:
         )
         plt.show()
 
-    def pad(self, new_vmin, new_vmax, extra=False):
-        """Pad the bins of the histogram until their outer edges exceed the range given.
+    def condition(self, left: float = -float('inf'), right: float = float('inf')) -> 'Histogram':
+        """Conditions the random variable as being in an interval (left, right).
+        Internally, this method zeros out probability mass outside the range and renormalizes.
+        If the interval divides a bin, the corresponding fraction of the bin's probability mass will kept. 
 
         Args:
-            new_vmin: Left pad target for the histogram's random variable.
-            new_vmax: Right pad target for the histogram's random variable.
-            extra: Add one extra atom to each side of the new histogram, 
+            left: Low bound for the random variable. Default value -float('inf').
+            right: High bound for the random variable. Default value float('inf').
+
+        Return:
+            New Histogram representing conditional distribution of random variable.
+        """
+        if not isinstance(left, int) and not isinstance(left, float):
+            raise TypeError("input 'left' must be int or float type.")
+        if not isinstance(right, int) and not isinstance(right, float):
+            raise TypeError("input 'right' must be int or float type.")
+        if left >= right:
+            raise ValueError("input 'left' must be less than 'right'.")
+        
+        probs = self.probs  # it's a deep copy
+        left_i = -float('inf')
+        right_i = float('inf')
+        for i in range(self.num_atoms):
+            if self.atoms[i] - self.atom_stride / 2 <= left < self.atoms[i] + self.atom_stride / 2:
+                left_i = i
+            if self.atoms[i] - self.atom_stride / 2 <= right < self.atoms[i] + self.atom_stride / 2:
+                right_i = i
+        
+        if left_i == right_i:
+            probs = np.zeros_like(probs)
+            probs[left_i] = 1.0
+        else:
+            for i in range(self.num_atoms):
+                if i < left_i or right_i < i:
+                    probs[i] = 0.0
+                if i == left_i:
+                    probs[i] *= ((self.atoms[i] + self.atom_stride / 2) - left) / self.atom_stride
+                if i == right_i:
+                    probs[i] *= (right - (self.atoms[i] - self.atom_stride / 2)) / self.atom_stride
+        
+        return Histogram(
+            vmin=self.vmin,
+            vmax=self.vmax,
+            num_atoms=self.num_atoms,
+            probs=Histogram.renormalize(probs)
+        )
+
+    def pad(self, left: float, right: float, extra: bool = False) -> 'Histogram':
+        """Pad the histogram with zero-mass bins until the outer edges exceed the range given.
+
+        Args:
+            left: Left pad target.
+            right: Right pad target. 
+            extra: Adds one extra atom to each side of the new histogram, 
                 beyond what is needed to cover the range specified. Defaults to False.
         
         Returns:
-            New histogram whose atoms minimally contain the range [new_vmin, new_vmax].
+            New Histogram whose atoms minimally contain the range [left, right].
         
         Raises:
-            ValueError: If vmin >= vmax.
-            ValueError: If self.vmin > new_vmin.
-            ValueError: If new_vmax < self.vmax.
+            ValueError: If left >= right.
+            ValueError: If self.vmin < left.
+            ValueError: If right < self.vmax.
         """
-        if new_vmin >= new_vmax:
-            raise ValueError("input 'new_vmin' must be less than 'new_vmax'.")
-        if self.vmin < new_vmin:
-            raise ValueError(f"missing left bin coverage of old distribution: (old_vmin < new_vmin), ({self.vmin} < {new_vmin})")
-        if new_vmax < self.vmax:
-            raise ValueError(f"missing right bin coverage of old distribution: (new_vmax < old_vmax), ({new_vmax} < {self.vmax})")
+        if left >= right:
+            raise ValueError("input 'left' must be less than 'right'.")
+        if self.vmin < left:
+            raise ValueError(f"missing left bin coverage of old distribution: (old_vmin < left), ({self.vmin} < {left})")
+        if right < self.vmax:
+            raise ValueError(f"missing right bin coverage of old distribution: (right < old_vmax), ({right} < {self.vmax})")
 
         atoms = self.atoms
         vmin = self.vmin
@@ -245,7 +379,7 @@ class Histogram:
         # pad old distribution with left atoms of zero probability mass
         # until old bins exceed left range of new ones
         left_atom_padding = []
-        while (new_vmin < vmin):
+        while (left < vmin):
             vmin -= self.atom_stride
             left_atom_padding.insert(0, vmin + self.atom_stride / 2)
         if extra:
@@ -257,7 +391,7 @@ class Histogram:
         # pad old distribution with right atoms of zero probability mass
         # until old bins exceed right range of new ones
         right_atom_padding = []
-        while (vmax < new_vmax):
+        while (vmax < right):
             vmax += self.atom_stride
             right_atom_padding.append(vmax - self.atom_stride / 2)
         if extra:
@@ -285,7 +419,7 @@ class Histogram:
         )
 
     def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
-        """Rebin the histogram so that the probability mass of each old bin 
+        """Rebin the histogram. Implemented so that the probability mass of each old bin 
         is shared according to the proportion of its intersection with each new bin.
 
         Args:
