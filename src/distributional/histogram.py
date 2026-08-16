@@ -61,6 +61,47 @@ class Histogram:
         self._num_atoms = num_atoms
         self._probs = probs
 
+    @classmethod
+    def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
+        """Create a histogram instance fit to the data.
+
+        Args:
+            vs: A numpy.ndarray of shape (n,) containing the data.
+            num_atoms: Optional number of bins. If None, uses sqrt(n).
+                Default value is None.
+
+        Returns:
+            A new Histogram instance describing the data.
+
+        Raises:
+            ValueError: If data array is not one-dimensional.
+            TypeError: If num_atoms is not int and not None.
+        """
+        if len(vs.shape) != 1:
+            raise ValueError("Only 1-dimensional data is supported.")
+        if not isinstance(num_atoms, int) and num_atoms is not None:
+            raise TypeError("Input 'num_atoms' must be int or None.")
+        if num_atoms is None:
+            num_atoms = math.ceil(vs.shape[0] ** 0.5)
+
+        vmin = np.min(vs, axis=-1)
+        vmax = np.max(vs, axis=-1)
+        atom_stride = (vmax - vmin) / num_atoms
+
+        idxs = np.floor((vs - vmin) / atom_stride).astype(np.int32)
+        idxs = np.minimum(np.maximum(idxs, 0), num_atoms - 1)
+        eye = np.eye(num_atoms)
+        idxs_onehot = np.take_along_axis(eye, idxs[..., None], axis=0)
+        counts = np.sum(idxs_onehot, axis=0)
+        probs = Histogram.renormalize(counts)
+
+        return Histogram(
+            vmin=vmin,
+            vmax=vmax,
+            num_atoms=num_atoms,
+            probs=probs,
+        )
+
     @property
     def vmin(self):
         """float: Minimum permitted value for the histogram's random variable."""
@@ -624,47 +665,6 @@ class Histogram:
             raise ValueError("Rectified probabilities sum to zero.")
         probs /= np.sum(probs, axis=-1)
         return probs
-
-    @classmethod
-    def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
-        """Create a histogram instance fit to the data.
-
-        Args:
-            vs: A numpy.ndarray of shape (n,) containing the data.
-            num_atoms: Optional number of bins. If None, uses sqrt(n).
-                Default value is None.
-
-        Returns:
-            A new Histogram instance describing the data.
-
-        Raises:
-            ValueError: If data array is not one-dimensional.
-            TypeError: If num_atoms is not int and not None.
-        """
-        if len(vs.shape) != 1:
-            raise ValueError("Only 1-dimensional data is supported.")
-        if not isinstance(num_atoms, int) and num_atoms is not None:
-            raise TypeError("Input 'num_atoms' must be int or None.")
-        if num_atoms is None:
-            num_atoms = math.ceil(vs.shape[0] ** 0.5)
-
-        vmin = np.min(vs, axis=-1)
-        vmax = np.max(vs, axis=-1)
-        atom_stride = (vmax - vmin) / num_atoms
-
-        idxs = np.floor((vs - vmin) / atom_stride).astype(np.int32)
-        idxs = np.minimum(np.maximum(idxs, 0), num_atoms - 1)
-        eye = np.eye(num_atoms)
-        idxs_onehot = np.take_along_axis(eye, idxs[..., None], axis=0)
-        counts = np.sum(idxs_onehot, axis=0)
-        probs = Histogram.renormalize(counts)
-
-        return Histogram(
-            vmin=vmin,
-            vmax=vmax,
-            num_atoms=num_atoms,
-            probs=probs,
-        )
 
     def _shift(self, shift: Union[int, float]) -> "Histogram":
         if not isinstance(shift, int) and not isinstance(shift, float):
