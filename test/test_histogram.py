@@ -205,19 +205,55 @@ def test_renormalize_guard_clauses():
         Histogram.renormalize(unif_histogram(10).probs * -1)
 
 
-def test_expectation_return():
-    h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
-    np.testing.assert_allclose(h.expectation, 0.0)
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_expectation_return(n):
+    h = unif_histogram(n)
+    np.testing.assert_allclose(h.expectation, 0.5, **TOLS)
 
 
 def test_variance_return():
     h = Histogram(-2, 2, 2, probs=unif_probs(2))  # atoms on -1, 1
-    np.testing.assert_allclose(h.variance, 1.0)
+    np.testing.assert_allclose(h.variance, 1.0, **TOLS)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_median_return(n):
+    h = unif_histogram(n)
+    np.testing.assert_allclose(h.median, 0.5, **TOLS)
+
+
+def test_mode_return():
+    h = Histogram(-2, 2, 2, probs=np.array([0.0, 1.0]))  # atoms on -1, 1
+    np.testing.assert_allclose(h.mode, 1.0, **TOLS)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_entropy_return(n):
+    h = unif_histogram(n)
+    np.testing.assert_allclose(h.entropy, np.log(n), **TOLS)
 
 
 def test_shift_return():
     assert type(unif_histogram(10)._shift(1)) == Histogram
     assert type(unif_histogram(10)._shift(1.0)) == Histogram
+
+
+def test_eq_return():
+    h = unif_histogram(10)
+
+    h2 = unif_histogram(10)
+    assert h == h2
+    h3 = unif_histogram(5)
+    assert h != h3
+    h4 = alt_histogram(10)
+    assert h != h4
+    h5 = wobbly_histogram(10)
+    assert h != h5
+
+
+def test_repr_return():
+    h = unif_histogram(5)
+    assert type(h.__repr__()) == str
 
 
 def test_add_return():
