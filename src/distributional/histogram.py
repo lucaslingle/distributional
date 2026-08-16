@@ -121,6 +121,21 @@ class Histogram:
         mu = self.expectation
         return np.sum(np.square(self.atoms - mu) * self.probs, axis=-1)
 
+    @property
+    def median(self) -> float:
+        """float: The median of the histogram, alias for self.inverse_cdf(0.5)."""
+        return self.inverse_cdf(0.5)
+
+    @property
+    def mode(self) -> float:
+        """float: The mode of the histogram."""
+        return self.atoms[np.argmax(self.probs, axis=-1)].item()
+
+    @property
+    def entropy(self) -> float:
+        """float: The entropy of the histogram, in nats."""
+        return -np.sum(self.probs * np.log(self.probs + 1e-6), axis=-1).item()
+
     def _shift(self, shift: Union[int, float]) -> "Histogram":
         if not isinstance(shift, int) and not isinstance(shift, float):
             raise TypeError("input 'shift' must be int or float type.")
@@ -172,6 +187,42 @@ class Histogram:
             num_atoms=2 * self.num_atoms - 1,
             probs=Histogram.renormalize(probs),
         )
+
+    def __eq__(self, other: "Histogram", atol=1e-4, rtol=1e-4) -> bool:
+        """Determines whether two histograms are equal, up to numerical errors.
+
+        Args:
+            other: Another Histogram instance.
+
+        Returns:
+            True if both instances are equal, up to numerical errors.
+            False otherwise.
+        """
+        if self.vmin != other.vmin:
+            return False
+        if self.vmax != other.vmax:
+            return False
+        if self.num_atoms != other.num_atoms:
+            return False
+        if not np.allclose(self.probs, other.probs, atol=atol, rtol=rtol):
+            return False
+        return True
+
+    def __repr__(self):
+        """A string representation of the Histogram object.
+
+        Returns:
+            A string containing information about vmin, vmax, num_atoms,
+            and the __repr__ of self.probs.
+        """
+        ls = []
+        ls.append("Histogram(\n")
+        ls.append(f"    vmin={self.vmin},\n")
+        ls.append(f"    vmax={self.vmax},\n")
+        ls.append(f"    num_atoms={self.num_atoms},\n")
+        ls.append(f"    probs={self.probs.__repr__()},\n")
+        ls.append(")")
+        return "".join(ls)
 
     def __add__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
         """Adds a scalar or an independent random variable to the current histogram's random variable.
