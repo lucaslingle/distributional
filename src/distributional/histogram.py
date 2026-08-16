@@ -212,7 +212,7 @@ class Histogram:
             vmin=min(other * self.vmin, other * self.vmax),
             vmax=max(other * self.vmin, other * self.vmax),
             num_atoms=self.num_atoms,
-            probs=self.probs,  # probs is already a deep copy of self._probs
+            probs=self.probs if other >= 0 else self.probs[::-1],
         )
 
     def __neg__(self) -> "Histogram":
@@ -222,7 +222,7 @@ class Histogram:
         Returns:
             A new Histogram instance representing the distribution of the new variable.
         """
-        return self * -1
+        return self.__mul__(-1)
 
     def __sub__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
         """Subtracts a scalar or an independent random variable from the current histogram's random variable.
@@ -287,7 +287,7 @@ class Histogram:
             TypeError: If other is not an int, float, or Histogram.
             ValueError: If other is a Histogram with different bins than self.
         """
-        return -self.__sub__(other)
+        return self.__sub__(other).__mul__(-1)
 
     def plot(self) -> None:
         """Plot the histogram using matplotlib."""
