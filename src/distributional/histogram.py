@@ -120,20 +120,8 @@ class Histogram:
         """
         mu = self.expectation
         return np.sum(np.square(self.atoms - mu) * self.probs, axis=-1)
-
-    def plot(self) -> None:
-        """Plot the histogram using matplotlib.
-        """
-        plt.bar(
-            self.atoms,
-            self.probs,
-            width=self.atom_stride,
-            edgecolor="black",
-            align="center"
-        )
-        plt.show()
     
-    def _shift(self: 'Histogram', shift: Union[int, float]) -> 'Histogram':
+    def _shift(self, shift: Union[int, float]) -> 'Histogram':
         if not isinstance(shift, int) and not isinstance(shift, float):
             raise TypeError("input 'shift' must be int or float type.")
         return Histogram(
@@ -143,7 +131,7 @@ class Histogram:
             probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
-    def _convolve(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+    def _convolve(self, other: 'Histogram') -> 'Histogram':
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
         if self.vmin != other.vmin:
@@ -164,7 +152,7 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def _convolve_slow(self: 'Histogram', other: 'Histogram') -> 'Histogram':
+    def _convolve_slow(self, other: 'Histogram') -> 'Histogram':
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
         if self.vmin != other.vmin:
@@ -185,7 +173,7 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def __add__(self: 'Histogram', other: Union[int, float, 'Histogram']) -> 'Histogram':
+    def __add__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
         """Adds a scalar or an independent random variable to the current histogram's random variable. 
 
         Args:
@@ -206,11 +194,11 @@ class Histogram:
             return self._convolve(other)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
-    def __mul__(self: 'Histogram', coef: Union[int, float]) -> 'Histogram':
+    def __mul__(self, other: Union[int, float]) -> 'Histogram':
         """Multiplies the current histogram's random variable by a scalar. 
 
         Args:
-            coef: An int or float.
+            other: An int or float.
 
         Returns:
             A new Histogram instance representing the distribution of the new variable.
@@ -218,19 +206,105 @@ class Histogram:
         Raises:
             TypeError: If other is not an int or float.
         """
-        if not isinstance(coef, int) and not isinstance(coef, float):
+        if not isinstance(other, int) and not isinstance(other, float):
             raise TypeError("input 'coef' must be int or float type.")
         return Histogram(
-            vmin=min(coef * self.vmin, coef * self.vmax),
-            vmax=max(coef * self.vmin, coef * self.vmax),
+            vmin=min(other * self.vmin, other * self.vmax),
+            vmax=max(other * self.vmin, other * self.vmax),
             num_atoms=self.num_atoms,
             probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
+    def __neg__(self) -> 'Histogram':
+        """
+        Negation of the histogram's random variable.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+        """
+        return self * -1
+
+    def __sub__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Subtracts a scalar or an independent random variable from the current histogram's random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        if isinstance(other, int):
+            return self._shift(-float(other))
+        if isinstance(other, float):
+            return self._shift(-other)
+        if isinstance(other, Histogram):
+            return self._convolve(-other)
+        raise TypeError("input 'other' must be int, float, or Histogram type.")
+
+    def __radd__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Adds a scalar or an independent random variable to the current histogram's random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        return self.__add__(other)
+
+    def __rmul__(self, other: Union[int, float]) -> 'Histogram':
+        """Multiplies the current histogram's random variable by a scalar. 
+
+        Args:
+            other: An int or float.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int or float.
+        """
+        return self.__mul__(other)
+
+    def __rsub__(self, other: Union[int, float, 'Histogram']) -> 'Histogram':
+        """Subtracts the current histogram's random variable from a scalar or an independent random variable. 
+
+        Args:
+            other: An int, float, or Histogram instance to be subtracted from.
+
+        Returns:
+            A new Histogram instance representing the distribution of the new variable.
+
+        Raises:
+            TypeError: If other is not an int, float, or Histogram.
+            ValueError: If other is a Histogram with different bins than self.
+        """
+        return -self.__sub__(other)
+
+    def plot(self) -> None:
+        """Plot the histogram using matplotlib.
+        """
+        plt.bar(
+            self.atoms,
+            self.probs,
+            width=self.atom_stride,
+            edgecolor="black",
+            align="center"
+        )
+        plt.show()
+
     def condition(self, left: float = -float('inf'), right: float = float('inf')) -> 'Histogram':
         """Conditions the random variable as being in an interval (left, right).
         Internally, this method zeros out probability mass outside the range and renormalizes.
-        If the interval divides a bin, the corresponding fraction of its probability mass will kept. 
+        If the interval divides a bin, the corresponding fraction of the bin's probability mass will kept. 
 
         Args:
             left: Low bound for the random variable. Default value -float('inf').
@@ -239,6 +313,10 @@ class Histogram:
         Return:
             New Histogram representing conditional distribution of random variable.
         """
+        if not isinstance(left, int) and not isinstance(left, float):
+            raise TypeError("input 'left' must be int or float type.")
+        if not isinstance(right, int) and not isinstance(right, float):
+            raise TypeError("input 'right' must be int or float type.")
         if left >= right:
             raise ValueError("input 'left' must be less than 'right'.")
         

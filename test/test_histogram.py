@@ -108,7 +108,27 @@ def test_mul_guard_clauses():
         unif_histogram(10) * unif_histogram(10)
 
 
+def test_sub_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10) - "str"
+    with pytest.raises(TypeError):
+        unif_histogram(10) - [0.1 for _ in range(10)]
+
+
+def test_condition_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).condition("str", 1.0)
+    with pytest.raises(TypeError):
+        unif_histogram(10).condition(0.0, "str")
+    with pytest.raises(ValueError):
+        unif_histogram(10).condition(2.0, -2.0)
+
+
 def test_pad_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).pad("str", 1.0)
+    with pytest.raises(TypeError):
+        unif_histogram(10).pad(0.0, "str")
     with pytest.raises(ValueError):
         unif_histogram(10).pad(2.0, -2.0)
     with pytest.raises(ValueError):
@@ -146,6 +166,41 @@ def test_add_return():
 def test_mul_return():
     assert type(unif_histogram(10) * 2) == Histogram
     assert type(unif_histogram(10) * 2.) == Histogram
+
+
+def test_neg_return():
+    h = unif_histogram(10)
+    assert type(-h) == Histogram
+    np.testing.assert_allclose((-h).probs, (h * -1).probs, **TOLS)
+
+
+def test_sub_return():
+    assert type(unif_histogram(10) - 1) == Histogram
+    assert type(unif_histogram(10) - 1.) == Histogram
+
+    h = Histogram(-1., 1., 10, probs=unif_probs(10))
+    assert type(h - h) == Histogram  # these are independent copies of the rv, fyi
+    np.testing.assert_allclose((h - h).probs, (h + h * -1).probs, **TOLS)
+    np.testing.assert_allclose((h - h).probs, (h + -h).probs, **TOLS)
+
+
+def test_radd_return():
+    h = unif_histogram(10)
+    assert type(1 + h) == Histogram
+    np.testing.assert_allclose((1 + h).atoms, (h + 1).atoms)
+
+
+def test_rmul_return():
+    h = unif_histogram(10)
+    assert type(2 * h) == Histogram
+    np.testing.assert_allclose((2 * h).atoms, (h * 2).atoms)
+
+
+def test_rsub_return():
+    h = unif_histogram(10)
+    assert type(1 - h) == Histogram
+    np.testing.assert_allclose((1 - h).atoms, (-h + 1).atoms)
+    np.testing.assert_allclose((1 - h).atoms, (-1 * h + 1).atoms)
 
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
