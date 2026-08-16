@@ -115,6 +115,27 @@ def test_sub_guard_clauses():
         unif_histogram(10) - [0.1 for _ in range(10)]
 
 
+def test_cdf_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).cdf("str")
+
+
+def test_inverse_cdf_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).inverse_cdf("str")
+    with pytest.raises(ValueError):
+        unif_histogram(10).inverse_cdf(-0.1)
+    with pytest.raises(ValueError):
+        unif_histogram(10).inverse_cdf(1.1)
+
+
+def test_sample_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).sample("str", None)
+    with pytest.raises(TypeError):
+        unif_histogram(10).sample(100, "str")
+
+
 def test_condition_guard_clauses():
     with pytest.raises(TypeError):
         unif_histogram(10).condition("str", 1.0)
@@ -201,6 +222,43 @@ def test_rsub_return():
     assert type(1 - h) == Histogram
     np.testing.assert_allclose((1 - h).atoms, (-h + 1).atoms)
     np.testing.assert_allclose((1 - h).atoms, (-1 * h + 1).atoms)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_cdf_return(n):
+    h = unif_histogram(n)
+    assert type(h.cdf(0.5)) == float
+    np.testing.assert_allclose(h.cdf(-100.0), 0.0, **TOLS)
+    np.testing.assert_allclose(h.cdf(0.0), 0.0, **TOLS)
+    np.testing.assert_allclose(h.cdf(0.25), 0.25, **TOLS)
+    np.testing.assert_allclose(h.cdf(0.5), 0.5, **TOLS)
+    np.testing.assert_allclose(h.cdf(0.75), 0.75, **TOLS)
+    np.testing.assert_allclose(h.cdf(1.0), 1.0, **TOLS)
+    np.testing.assert_allclose(h.cdf(100.0), 1.0, **TOLS)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_inverse_cdf_return(n):
+    h = unif_histogram(n)
+    assert type(h.inverse_cdf(0.5)) == float
+    np.testing.assert_allclose(h.inverse_cdf(0.0), 0.0, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(0.25), 0.25, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(0.5), 0.5, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(0.75), 0.75, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(1.0), 1.0, **TOLS)
+
+    np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.1)), 0.1, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.22)), 0.22, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.37)), 0.37, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.59)), 0.59, **TOLS)
+    np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.74)), 0.74, **TOLS)
+
+
+@pytest.mark.parametrize("samples", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_sample_return(samples):
+    h = unif_histogram(10)
+    assert type(h.sample(1, None)) == np.ndarray
+    assert h.sample(samples, None).shape == (samples,)
 
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
