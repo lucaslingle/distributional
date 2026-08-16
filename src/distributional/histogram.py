@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Union, Optional
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -301,8 +301,107 @@ class Histogram:
         )
         plt.show()
 
+    def cdf(self, v: float) -> float:
+        """Evaluate the cumulative distribution function at particular point. 
+
+        Evaluating at points between histogram bin edges will include a fraction of the containing bin's probability mass.
+        Points less than self.vmin or more than self.vmax are allowed, and return 0.0 or 1.0, respectively.
+
+        Args:
+            v: The point to evaluate the CDF at.
+
+        Returns:
+            The probability of a sample being less than or equal to v.
+
+        Raises:
+            TypeError: if v is not an int or float.
+        """
+        if not isinstance(v, int) and not isinstance(v, float):
+            raise TypeError("Input 'v' must be of type int or float.")
+        
+        if v < self.vmin:
+            return 0.0
+        if self.vmax <= v:
+            return 1.0
+
+        atoms = self.atoms
+        probs = self.probs
+        for i, a in enumerate(atoms, 0):
+            if a - self.atom_stride / 2 <= v < a + self.atom_stride / 2:
+                break
+        prob = 0.0
+        if i > 0:
+            prob += np.sum(probs[0:i], axis=-1)
+        prob += ((v - (a - self.atom_stride / 2)) / self.atom_stride) * probs[i]
+        return prob.item()
+
+    def inverse_cdf(self, p: float) -> float:
+        """Evaluate the inverse of the cumulative distribution function at a particular point.
+
+        Implemented so that this function is a local inverse of self.cdf(v), i.e.,
+        we have self.inverse_cdf(self.cdf(v)) == v for any v between self.vmin and self.vmax.
+        This means probability values between bin increments are assigned to the sample space 
+        based on their distance between the increments.
+
+        Args:
+            p: A probability value with 0 <= p <= 1.
+
+        Returns:
+            The value in the sample space corresponding to the cumulative probability given.
+
+        Raises:
+            TypeError: If p is not an int or float type.
+            ValueError: If p is not between 0 and 1, inclusive. 
+        """
+        if not isinstance(p, int) and not isinstance(p, float):
+            raise TypeError("Input 'p' must be of type int or float.")
+        if not (0.0 <= p <= 1.0):
+            raise ValueError("Input 'p' must be in range 0 <= p <= 1.")
+
+        if p == 0.0:
+            return self.vmin
+        if p == 1.0:
+            return self.vmax
+
+        atoms = self.atoms
+        probs = self.probs
+        summed = np.concatenate([np.array([0.0]), np.cumsum(probs, axis=-1)], axis=-1)
+        i = 0  # declare here in case num_atoms == 1
+        for i in range(0, self.num_atoms-1):
+            if summed[i] <= p < summed[i+1]:
+                break
+        quantile = atoms[i] - self.atom_stride / 2
+        quantile += ((p - summed[i]) / probs[i]) * self.atom_stride
+        return quantile.item()
+
+    def sample(self, n: int = 1, rng: Optional[np.random.Generator] = None) -> float:
+        """Sample n points from the distribution represented by the histogram.
+
+        Args:
+            n: The number of points to sample. Default value is 1.
+            rng: An optional numpy.random.Generator object to support the modern numpy RNG API.
+                 If omitted, uses numpy's legacy global RNG. Default value is None.
+
+        Returns:
+            A numpy.ndarray with shape (n,) containing the samples.
+
+        Raises:
+            TypeError: If input n is not an int.
+            TypeError: If input rng is not numpy.random.Generator or None.
+        """
+        if not isinstance(n, int):
+            raise TypeError("Input 'n' must be an int.")
+        if not isinstance(rng, np.random.Generator) and rng is not None:
+            raise TypeError("Input 'rng' must be numpy.random.Generator or None (for legacy rng).")
+        if rng is None:
+            u = np.random.uniform(low=0., high=1., size=[n])
+        else:
+            u = rng.uniform(low=0., high=1., size=[n])
+        return np.vectorize(self.inverse_cdf)(u) 
+
     def condition(self, left: float = -float('inf'), right: float = float('inf')) -> 'Histogram':
         """Conditions the random variable as being in an interval (left, right).
+
         Internally, this method zeros out probability mass outside the range and renormalizes.
         If the interval divides a bin, the corresponding fraction of the bin's probability mass will kept. 
 
@@ -419,8 +518,10 @@ class Histogram:
         )
 
     def rebin(self, new_vmin: float, new_vmax: float, new_num_atoms: int) -> 'Histogram':
-        """Rebin the histogram. Implemented so that the probability mass of each old bin 
-        is shared according to the proportion of its intersection with each new bin.
+        """Rebin the histogram. 
+        
+        Implemented so that the probability mass of each old bin is shared according 
+        to the proportion of its intersection with each new bin.
 
         Args:
             new_vmin: Minimum permitted value for the new histogram's random variable.
