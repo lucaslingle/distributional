@@ -109,6 +109,14 @@ class Histogram:
         return output
 
     @property
+    def bin_edges(self) -> np.ndarray:
+        """numpy.ndarray: The edges for the histogram bins.
+        """
+        output = np.arange(self.num_atoms + 1) * self.atom_stride + self.vmin
+        np.testing.assert_allclose(output[-1], self.vmax)
+        return output
+
+    @property
     def expectation(self) -> float:
         """float: The expectation (mean) of the histogram.
         """
@@ -324,11 +332,13 @@ class Histogram:
         if self.vmax <= v:
             return 1.0
 
-        atoms = self.atoms
         probs = self.probs
-        for i, a in enumerate(atoms, 0):
-            if a - self.atom_stride / 2 <= v < a + self.atom_stride / 2:
+        edges = self.bin_edges
+        for i in range(0, self.num_atoms):
+            if edges[i] <= v < edges[i+1]:
                 break
+        a = self.atoms[i]
+
         prob = 0.0
         if i > 0:
             prob += np.sum(probs[0:i], axis=-1)
@@ -366,8 +376,7 @@ class Histogram:
         atoms = self.atoms
         probs = self.probs
         summed = np.concatenate([np.array([0.0]), np.cumsum(probs, axis=-1)], axis=-1)
-        i = 0  # declare here in case num_atoms == 1
-        for i in range(0, self.num_atoms-1):
+        for i in range(0, self.num_atoms):
             if summed[i] <= p < summed[i+1]:
                 break
         quantile = atoms[i] - self.atom_stride / 2
@@ -419,13 +428,14 @@ class Histogram:
         if left >= right:
             raise ValueError("input 'left' must be less than 'right'.")
         
+        edges = self.bin_edges
         probs = self.probs  # it's a deep copy
         left_i = -float('inf')
         right_i = float('inf')
-        for i in range(self.num_atoms):
-            if self.atoms[i] - self.atom_stride / 2 <= left < self.atoms[i] + self.atom_stride / 2:
+        for i in range(0, self.num_atoms):
+            if edges[i] <= left < edges[i+1]:
                 left_i = i
-            if self.atoms[i] - self.atom_stride / 2 <= right < self.atoms[i] + self.atom_stride / 2:
+            if edges[i] <= right < edges[i+1]:
                 right_i = i
         
         if left_i == right_i:
@@ -436,9 +446,9 @@ class Histogram:
                 if i < left_i or right_i < i:
                     probs[i] = 0.0
                 if i == left_i:
-                    probs[i] *= ((self.atoms[i] + self.atom_stride / 2) - left) / self.atom_stride
+                    probs[i] *= (edges[i+1] - left) / self.atom_stride
                 if i == right_i:
-                    probs[i] *= (right - (self.atoms[i] - self.atom_stride / 2)) / self.atom_stride
+                    probs[i] *= (right - edges[i]) / self.atom_stride
         
         return Histogram(
             vmin=self.vmin,
@@ -538,30 +548,30 @@ class Histogram:
                 This should never occur.
         """
         old_padded = self.pad(new_vmin, new_vmax, extra=True)
-        old_atoms = old_padded.atoms
         old_probs = old_padded.probs
+        old_edges = old_padded.bin_edges
 
         # loop over new bins, figure out how much old probability mass they intersect with
         new_atom_stride = (new_vmax - new_vmin) / new_num_atoms
-        new_atoms = np.arange(new_num_atoms) * new_atom_stride + new_vmin + new_atom_stride/2
         new_probs = np.zeros(dtype=self.probs.dtype, shape=[new_num_atoms])
+        new_edges = np.arange(new_num_atoms+1) * new_atom_stride + new_vmin
         j = 0
         for i in range(0, new_num_atoms):
             logging.debug(f"new i: {i}")
             # for each new i, we should only get to it once its left side is past
             # the left side of of old bin j. 
-            old_left = old_atoms[j] - self.atom_stride / 2
-            old_right = old_atoms[j] + self.atom_stride / 2
-            new_left = new_atoms[i] - new_atom_stride / 2
-            new_right = new_atoms[i] + new_atom_stride / 2
+            old_left = old_edges[j]
+            old_right = old_edges[j+1]
+            new_left = new_edges[i]
+            new_right = new_edges[i+1]
             if not (old_left <= new_left):
                 raise RuntimeError(f"got old_left > new_left: {old_left} > {new_left}")
 
             # now we loop over old bins j and add in the contrib to new bin i
             while (old_left < new_right):
                 logging.debug(f"current i,j: {i},{j}")
-                old_left = old_atoms[j] - self.atom_stride / 2
-                old_right = old_atoms[j] + self.atom_stride / 2
+                old_left = old_edges[j]
+                old_right = old_edges[j+1]
                 logging.debug(f"new_left, new_right: {new_left}, {new_right}")
                 logging.debug(f"old_left, old_right: {old_left}, {old_right}")
 

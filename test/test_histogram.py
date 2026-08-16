@@ -20,12 +20,25 @@ def alt_probs(n, consec=1, **kwargs):
         return unif_probs(n)
 
 
+def wobbly_probs(n, consec=1, **kwargs):
+    assert consec >= 0
+    if consec > 0:
+        mass = np.array([(1. if (i // consec) % 2 == 0 else 0.5) for i in range(n)])
+        return Histogram.renormalize(mass)
+    else:
+        return unif_probs(n)
+
+
 def unif_histogram(n, **kwargs):
     return Histogram(0., 1., n, unif_probs(n))
 
 
 def alt_histogram(n, consec=1, **kwargs):
     return Histogram(0., 1., n, alt_probs(n, consec))
+
+
+def wobbly_histogram(n, consec=1, **kwargs):
+    return Histogram(0., 1., n, wobbly_probs(n, consec))
 
 
 def test_init_guard_clauses():
@@ -247,11 +260,23 @@ def test_inverse_cdf_return(n):
     np.testing.assert_allclose(h.inverse_cdf(0.75), 0.75, **TOLS)
     np.testing.assert_allclose(h.inverse_cdf(1.0), 1.0, **TOLS)
 
+
+@pytest.mark.parametrize("hist", [unif_histogram, wobbly_histogram])
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
+def test_inverse_cdf_return_roundtrip(hist, n):
+    h = hist(n)
+
     np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.1)), 0.1, **TOLS)
     np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.22)), 0.22, **TOLS)
     np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.37)), 0.37, **TOLS)
     np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.59)), 0.59, **TOLS)
     np.testing.assert_allclose(h.inverse_cdf(h.cdf(0.74)), 0.74, **TOLS)
+
+    np.testing.assert_allclose(h.cdf(h.inverse_cdf(0.1)), 0.1, **TOLS)
+    np.testing.assert_allclose(h.cdf(h.inverse_cdf(0.22)), 0.22, **TOLS)
+    np.testing.assert_allclose(h.cdf(h.inverse_cdf(0.37)), 0.37, **TOLS)
+    np.testing.assert_allclose(h.cdf(h.inverse_cdf(0.59)), 0.59, **TOLS)
+    np.testing.assert_allclose(h.cdf(h.inverse_cdf(0.74)), 0.74, **TOLS)
 
 
 @pytest.mark.parametrize("samples", [1, 2, 3, 4, 5, 6, 10, 100])
