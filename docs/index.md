@@ -1,6 +1,6 @@
 # Distributional
 
-A library for histogram arithmetic. 
+A library for histogram arithmetic.
 
 # API Reference
 
