@@ -14,9 +14,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = [
+dev = [
     "pytest~=9.0.3",
     "coverage~=7.14.1",
+    "pre-commit~=4.6.2",
+    "black~=26.5.1",
 ]
 docs = [
     "mkdocs~=1.6.1",

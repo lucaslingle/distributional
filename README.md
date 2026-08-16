@@ -10,7 +10,7 @@ To install from github, clone this repo and run
 pip install .
 ```
 
-For unit testing and docs dependencies, replace ```.``` with ```'.[test]'```, ```'.[docs]```, or ```'.[test,docs]'```. 
+For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]```, or ```'.[dev,docs]'```.
 
 ### documentation
 To read the documentation, you can run
