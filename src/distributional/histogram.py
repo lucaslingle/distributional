@@ -177,7 +177,9 @@ class Histogram:
     def differential_entropy(self) -> float:
         """float: The differential entropy of the underlying density, in nats."""
         density = self.probs / self.atom_stride  # integral of density over bin = prob
-        return -np.sum(density * np.log(density + 1e-6), axis=-1).item()
+        return -np.sum(
+            density * self.atom_stride * np.log(density + 1e-6), axis=-1
+        ).item()
 
     def __eq__(
         self, other: "Histogram", atol: float = 1e-4, rtol: float = 1e-4
