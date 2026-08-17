@@ -227,10 +227,26 @@ def test_mode_return():
     np.testing.assert_allclose(h.mode, 1.0, **TOLS)
 
 
-@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
-def test_entropy_return(n):
-    h = unif_histogram(n)
-    np.testing.assert_allclose(h.entropy, np.log(n), **TOLS)
+def test_differential_entropy_return():
+    rng = np.random.default_rng()
+    h = Histogram.empirical(rng.normal(size=[100_000]))
+    np.testing.assert_allclose(
+        h.differential_entropy, 0.5 * np.log(2 * 3.14 * 2.718), atol=1e-2, rtol=1e-2
+    )
+    h2 = h * 1000
+    np.testing.assert_allclose(
+        h2.differential_entropy,
+        0.5 * np.log(2 * 3.14 * 2.718 * 1000**2),
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    h3 = h * 0.001
+    np.testing.assert_allclose(
+        h3.differential_entropy,
+        0.5 * np.log(2 * 3.14 * 2.718 * 0.001**2),
+        atol=1e-2,
+        rtol=1e-2,
+    )
 
 
 def test_shift_return():
