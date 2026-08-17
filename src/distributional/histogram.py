@@ -61,6 +61,47 @@ class Histogram:
         self._num_atoms = num_atoms
         self._probs = probs
 
+    @classmethod
+    def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
+        """Create a histogram instance fit to the data.
+
+        Args:
+            vs: A numpy.ndarray of shape (n,) containing the data.
+            num_atoms: Optional number of bins. If None, uses sqrt(n).
+                Default value is None.
+
+        Returns:
+            A new Histogram instance describing the data.
+
+        Raises:
+            ValueError: If data array is not one-dimensional.
+            TypeError: If num_atoms is not int and not None.
+        """
+        if len(vs.shape) != 1:
+            raise ValueError("Only 1-dimensional data is supported.")
+        if not isinstance(num_atoms, int) and num_atoms is not None:
+            raise TypeError("Input 'num_atoms' must be int or None.")
+        if num_atoms is None:
+            num_atoms = math.ceil(vs.shape[0] ** 0.5)
+
+        vmin = np.min(vs, axis=-1)
+        vmax = np.max(vs, axis=-1)
+        atom_stride = (vmax - vmin) / num_atoms
+
+        idxs = np.floor((vs - vmin) / atom_stride).astype(np.int32)
+        idxs = np.minimum(np.maximum(idxs, 0), num_atoms - 1)
+        eye = np.eye(num_atoms)
+        idxs_onehot = np.take_along_axis(eye, idxs[..., None], axis=0)
+        counts = np.sum(idxs_onehot, axis=0)
+        probs = Histogram.renormalize(counts)
+
+        return Histogram(
+            vmin=vmin,
+            vmax=vmax,
+            num_atoms=num_atoms,
+            probs=probs,
+        )
+
     @property
     def vmin(self):
         """float: Minimum permitted value for the histogram's random variable."""
@@ -136,63 +177,18 @@ class Histogram:
         """float: The entropy of the histogram, in nats."""
         return -np.sum(self.probs * np.log(self.probs + 1e-6), axis=-1).item()
 
-    def _shift(self, shift: Union[int, float]) -> "Histogram":
-        if not isinstance(shift, int) and not isinstance(shift, float):
-            raise TypeError("input 'shift' must be int or float type.")
-        return Histogram(
-            vmin=shift + self.vmin,
-            vmax=shift + self.vmax,
-            num_atoms=self.num_atoms,
-            probs=self.probs,  # probs is already a deep copy of self._probs
-        )
-
-    def _convolve(self, other: "Histogram") -> "Histogram":
-        if not isinstance(other, Histogram):
-            raise TypeError("input 'other' must be Histogram type.")
-        if self.vmin != other.vmin:
-            raise ValueError("other.vmin must equal self.vmin")
-        if self.vmax != other.vmax:
-            raise ValueError("other.vmax must equal self.vmax")
-        if self.num_atoms != other.num_atoms:
-            raise ValueError("other.num_atoms must equal self.num_atoms")
-
-        conv_size = 2 * self.num_atoms - 1
-        fx = np.fft.rfft(self.probs, n=conv_size)
-        fy = np.fft.rfft(other.probs, n=conv_size)
-        probs = np.fft.irfft(fx * fy, n=conv_size)
-        return Histogram(
-            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
-            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
-            num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram.renormalize(probs),
-        )
-
-    def _convolve_slow(self, other: "Histogram") -> "Histogram":
-        if not isinstance(other, Histogram):
-            raise TypeError("input 'other' must be Histogram type.")
-        if self.vmin != other.vmin:
-            raise ValueError("other.vmin must equal self.vmin")
-        if self.vmax != other.vmax:
-            raise ValueError("other.vmax must equal self.vmax")
-        if self.num_atoms != other.num_atoms:
-            raise ValueError("other.num_atoms must equal self.num_atoms")
-
-        probs = np.zeros(dtype=self.probs.dtype, shape=[2 * self.num_atoms - 1])
-        for i in range(0, len(self.atoms)):
-            for j in range(0, len(self.atoms)):
-                probs[i + j] += self.probs[i] * other.probs[j]
-        return Histogram(
-            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
-            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
-            num_atoms=2 * self.num_atoms - 1,
-            probs=Histogram.renormalize(probs),
-        )
-
-    def __eq__(self, other: "Histogram", atol=1e-4, rtol=1e-4) -> bool:
+    def __eq__(
+        self, other: "Histogram", atol: float = 1e-4, rtol: float = 1e-4
+    ) -> bool:
         """Determines whether two histograms are equal, up to numerical errors.
+
+        To use non-default atol and rtol, must use the ```__eq__``` form,
+        not the ```==``` operator.
 
         Args:
             other: Another Histogram instance.
+            atol: Absolute error tolerance for probability comparison.
+            rtol: Relative error tolerance for probability comparison.
 
         Returns:
             True if both instances are equal, up to numerical errors.
@@ -208,12 +204,12 @@ class Histogram:
             return False
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """A string representation of the Histogram object.
 
         Returns:
             A string containing information about vmin, vmax, num_atoms,
-            and the __repr__ of self.probs.
+                and the ```__repr__``` of self.probs.
         """
         ls = []
         ls.append("Histogram(\n")
@@ -670,43 +666,54 @@ class Histogram:
         probs /= np.sum(probs, axis=-1)
         return probs
 
-    @staticmethod
-    def empirical(vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
-        """Create a histogram instance fit to the data.
-
-        Args:
-            vs: A numpy.ndarray of shape (n,) containing the data.
-            num_atoms: Optional number of bins. If None, uses sqrt(n).
-                Default value is None.
-
-        Returns:
-            A new Histogram instance describing the data.
-
-        Raises:
-            ValueError: If data array is not one-dimensional.
-            TypeError: If num_atoms is not int and not None.
-        """
-        if len(vs.shape) != 1:
-            raise ValueError("Only 1-dimensional data is supported.")
-        if not isinstance(num_atoms, int) and num_atoms is not None:
-            raise TypeError("Input 'num_atoms' must be int or None.")
-        if num_atoms is None:
-            num_atoms = math.ceil(vs.shape[0] ** 0.5)
-
-        vmin = np.min(vs, axis=-1)
-        vmax = np.max(vs, axis=-1)
-        atom_stride = (vmax - vmin) / num_atoms
-
-        idxs = np.floor((vs - vmin) / atom_stride).astype(np.int32)
-        idxs = np.minimum(np.maximum(idxs, 0), num_atoms - 1)
-        eye = np.eye(num_atoms)
-        idxs_onehot = np.take_along_axis(eye, idxs[..., None], axis=0)
-        counts = np.sum(idxs_onehot, axis=0)
-        probs = Histogram.renormalize(counts)
-
+    def _shift(self, shift: Union[int, float]) -> "Histogram":
+        if not isinstance(shift, int) and not isinstance(shift, float):
+            raise TypeError("input 'shift' must be int or float type.")
         return Histogram(
-            vmin=vmin,
-            vmax=vmax,
-            num_atoms=num_atoms,
-            probs=probs,
+            vmin=shift + self.vmin,
+            vmax=shift + self.vmax,
+            num_atoms=self.num_atoms,
+            probs=self.probs,  # probs is already a deep copy of self._probs
+        )
+
+    def _convolve(self, other: "Histogram") -> "Histogram":
+        if not isinstance(other, Histogram):
+            raise TypeError("input 'other' must be Histogram type.")
+        if self.vmin != other.vmin:
+            raise ValueError("other.vmin must equal self.vmin")
+        if self.vmax != other.vmax:
+            raise ValueError("other.vmax must equal self.vmax")
+        if self.num_atoms != other.num_atoms:
+            raise ValueError("other.num_atoms must equal self.num_atoms")
+
+        conv_size = 2 * self.num_atoms - 1
+        fx = np.fft.rfft(self.probs, n=conv_size)
+        fy = np.fft.rfft(other.probs, n=conv_size)
+        probs = np.fft.irfft(fx * fy, n=conv_size)
+        return Histogram(
+            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
+            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
+            num_atoms=2 * self.num_atoms - 1,
+            probs=Histogram.renormalize(probs),
+        )
+
+    def _convolve_slow(self, other: "Histogram") -> "Histogram":
+        if not isinstance(other, Histogram):
+            raise TypeError("input 'other' must be Histogram type.")
+        if self.vmin != other.vmin:
+            raise ValueError("other.vmin must equal self.vmin")
+        if self.vmax != other.vmax:
+            raise ValueError("other.vmax must equal self.vmax")
+        if self.num_atoms != other.num_atoms:
+            raise ValueError("other.num_atoms must equal self.num_atoms")
+
+        probs = np.zeros(dtype=self.probs.dtype, shape=[2 * self.num_atoms - 1])
+        for i in range(0, len(self.atoms)):
+            for j in range(0, len(self.atoms)):
+                probs[i + j] += self.probs[i] * other.probs[j]
+        return Histogram(
+            vmin=self.atom_min + other.atom_min - self.atom_stride / 2,
+            vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
+            num_atoms=2 * self.num_atoms - 1,
+            probs=Histogram.renormalize(probs),
         )
