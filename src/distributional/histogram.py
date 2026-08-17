@@ -243,7 +243,9 @@ class Histogram:
             spec = dict(
                 new_vmin=min(self.vmin, other.vmin),
                 new_vmax=max(self.vmax, other.vmax),
-                new_num_atoms=math.ceil(self.num_atoms**2 + other.num_atoms**2),
+                new_num_atoms=math.ceil(
+                    (self.num_atoms**2 + other.num_atoms**2) ** 0.5
+                ),
             )
             return self.rebin(**spec).convolve(other.rebin(**spec))
         raise TypeError("input 'other' must be int, float, or Histogram type.")
