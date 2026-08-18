@@ -139,9 +139,9 @@ class Histogram:
         if min(weights) < 0.0:
             raise ValueError("input 'weights' must be all non-negative.")
 
-        new_vmin = (min(h.vmin for h in hists),)
-        new_vmax = (max(h.vmax for h in hists),)
-        new_num_atoms = (math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5),)
+        new_vmin = min(h.vmin for h in hists)
+        new_vmax = max(h.vmax for h in hists)
+        new_num_atoms = math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5)
         spec = dict(
             new_vmin=new_vmin,
             new_vmax=new_vmax,
