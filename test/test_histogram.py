@@ -80,49 +80,49 @@ def test_init_guard_clauses():
 
 def test_shift_guard_clauses():
     with pytest.raises(TypeError):
-        unif_histogram(10)._shift(shift="str")
+        unif_histogram(10).shift(shift="str")
     with pytest.raises(TypeError):
-        unif_histogram(10)._shift(shift=unif_histogram(10))
+        unif_histogram(10).shift(shift=unif_histogram(10))
 
 
 def test_convolve_guard_clauses():
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve(other="str")
+        unif_histogram(10).convolve(other="str")
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve(other=1)
+        unif_histogram(10).convolve(other=1)
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve(other=1.0)
+        unif_histogram(10).convolve(other=1.0)
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve(
             Histogram(-1.0, 1.0, 10, unif_probs(10))
         )
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve(
             Histogram(0.0, 2.0, 10, unif_probs(10))
         )
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve(
             Histogram(0.0, 1.0, 11, unif_probs(11))
         )
 
 
 def test_convolve_slow_guard_clauses():
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve_slow(other="str")
+        unif_histogram(10).convolve_slow(other="str")
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve_slow(other=1)
+        unif_histogram(10).convolve_slow(other=1)
     with pytest.raises(TypeError):
-        unif_histogram(10)._convolve_slow(other=1.0)
+        unif_histogram(10).convolve_slow(other=1.0)
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve_slow(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve_slow(
             Histogram(-1.0, 1.0, 10, unif_probs(10))
         )
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve_slow(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve_slow(
             Histogram(0.0, 2.0, 10, unif_probs(10))
         )
     with pytest.raises(ValueError):
-        Histogram(0.0, 1.0, 10, unif_probs(10))._convolve_slow(
+        Histogram(0.0, 1.0, 10, unif_probs(10)).convolve_slow(
             Histogram(0.0, 1.0, 11, unif_probs(11))
         )
 
@@ -227,15 +227,31 @@ def test_mode_return():
     np.testing.assert_allclose(h.mode, 1.0, **TOLS)
 
 
-@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
-def test_entropy_return(n):
-    h = unif_histogram(n)
-    np.testing.assert_allclose(h.entropy, np.log(n), **TOLS)
+def test_differential_entropy_return():
+    rng = np.random.default_rng()
+    h = Histogram.empirical(rng.normal(size=[100_000]))
+    np.testing.assert_allclose(
+        h.differential_entropy, 0.5 * np.log(2 * 3.14 * 2.718), atol=1e-2, rtol=1e-2
+    )
+    h2 = h * 1000
+    np.testing.assert_allclose(
+        h2.differential_entropy,
+        0.5 * np.log(2 * 3.14 * 2.718 * 1000**2),
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    h3 = h * 0.001
+    np.testing.assert_allclose(
+        h3.differential_entropy,
+        0.5 * np.log(2 * 3.14 * 2.718 * 0.001**2),
+        atol=1e-2,
+        rtol=1e-2,
+    )
 
 
 def test_shift_return():
-    assert type(unif_histogram(10)._shift(1)) == Histogram
-    assert type(unif_histogram(10)._shift(1.0)) == Histogram
+    assert type(unif_histogram(10).shift(1)) == Histogram
+    assert type(unif_histogram(10).shift(1.0)) == Histogram
 
 
 def test_eq_return():
@@ -363,8 +379,8 @@ def test_empirical_return():
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
 def test_histogram_convolve_rel_test(hist, n):
     h = hist(n)
-    hc = h._convolve(h)
-    hcs = h._convolve_slow(h)
+    hc = h.convolve(h)
+    hcs = h.convolve_slow(h)
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
 
 

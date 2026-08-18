@@ -1,5 +1,6 @@
 import logging
 import math
+from enum import auto
 from typing import Optional
 from typing import Union
 
@@ -173,9 +174,12 @@ class Histogram:
         return self.atoms[np.argmax(self.probs, axis=-1)].item()
 
     @property
-    def entropy(self) -> float:
-        """float: The entropy of the histogram, in nats."""
-        return -np.sum(self.probs * np.log(self.probs + 1e-6), axis=-1).item()
+    def differential_entropy(self) -> float:
+        """float: The differential entropy of the underlying density, in nats."""
+        density = self.probs / self.atom_stride  # integral of density over bin = prob
+        return -np.sum(
+            self.atom_stride * density * np.log(density + 1e-6), axis=-1
+        ).item()
 
     def __eq__(
         self, other: "Histogram", atol: float = 1e-4, rtol: float = 1e-4
@@ -233,12 +237,17 @@ class Histogram:
             TypeError: If other is not an int, float, or Histogram.
             ValueError: If other is a Histogram with different bins than self.
         """
-        if isinstance(other, int):
-            return self._shift(float(other))
-        if isinstance(other, float):
-            return self._shift(other)
+        if isinstance(other, int) or isinstance(other, float):
+            return self.shift(other)
         if isinstance(other, Histogram):
-            return self._convolve(other)
+            spec = dict(
+                new_vmin=min(self.vmin, other.vmin),
+                new_vmax=max(self.vmax, other.vmax),
+                new_num_atoms=math.ceil(
+                    (self.num_atoms**2 + other.num_atoms**2) ** 0.5
+                ),
+            )
+            return self.rebin(**spec).convolve(other.rebin(**spec))
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def __mul__(self, other: Union[int, float]) -> "Histogram":
@@ -284,12 +293,12 @@ class Histogram:
             TypeError: If other is not an int, float, or Histogram.
             ValueError: If other is a Histogram with different bins than self.
         """
-        if isinstance(other, int):
-            return self._shift(-float(other))
-        if isinstance(other, float):
-            return self._shift(-other)
-        if isinstance(other, Histogram):
-            return self._convolve(-other)
+        if (
+            isinstance(other, int)
+            or isinstance(other, float)
+            or isinstance(other, Histogram)
+        ):
+            return self.__add__(-other)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def __radd__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
@@ -666,25 +675,49 @@ class Histogram:
         probs /= np.sum(probs, axis=-1)
         return probs
 
-    def _shift(self, shift: Union[int, float]) -> "Histogram":
-        if not isinstance(shift, int) and not isinstance(shift, float):
-            raise TypeError("input 'shift' must be int or float type.")
+    def shift(self, scalar: Union[int, float]) -> "Histogram":
+        """Add a scalar to the histogram's random variable.
+
+        For addition of independent random variables, see ```convolve``` or ```__add__```.
+
+        Args:
+            scalar: A scalar to be added.
+
+        Returns:
+            A new Histogram instance representing the shifted variable.
+
+        Raises:
+            TypeError: If the inputted shift variable is not an int or float.
+        """
+        if not isinstance(scalar, int) and not isinstance(scalar, float):
+            raise TypeError("input 'scalar' must be int or float type.")
         return Histogram(
-            vmin=shift + self.vmin,
-            vmax=shift + self.vmax,
+            vmin=scalar + self.vmin,
+            vmax=scalar + self.vmax,
             num_atoms=self.num_atoms,
             probs=self.probs,  # probs is already a deep copy of self._probs
         )
 
-    def _convolve(self, other: "Histogram") -> "Histogram":
+    def convolve(self, other: "Histogram") -> "Histogram":
+        """Convolve two Histogram instances in O(nlogn) time, where n is bin count,
+        using the circular convolution theorem.
+
+        For a simpler method to compare against, see ```convolve_slow```.
+
+        Args:
+            other: A Histogram instance to be convolved with.
+
+        Returns:
+            A new Histogram instance representing the addition of the random variables.
+
+        Raises:
+            TypeError: If the inputted 'other' variable is not a Histogram.
+            ValueError: If self.bin_edges != other.bin_edges up to numerical precision.
+        """
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
-        if self.vmin != other.vmin:
-            raise ValueError("other.vmin must equal self.vmin")
-        if self.vmax != other.vmax:
-            raise ValueError("other.vmax must equal self.vmax")
-        if self.num_atoms != other.num_atoms:
-            raise ValueError("other.num_atoms must equal self.num_atoms")
+        if not np.allclose(self.bin_edges, other.bin_edges, atol=1e-4, rtol=1e-4):
+            raise ValueError("input other.bin_edges must match self.bin_edges.")
 
         conv_size = 2 * self.num_atoms - 1
         fx = np.fft.rfft(self.probs, n=conv_size)
@@ -697,15 +730,26 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def _convolve_slow(self, other: "Histogram") -> "Histogram":
+    def convolve_slow(self, other: "Histogram") -> "Histogram":
+        """Convolve two Histogram instances in O(n^2) time, where n is bin count.
+
+        For a faster method, see ```convolve```.
+
+        Args:
+            other: A Histogram instance to be convolved with.
+
+        Returns:
+            A new Histogram instance representing the addition of the random variables.
+
+        Raises:
+            TypeError: If the inputted 'other' variable is not a Histogram.
+            ValueError: If self.bin_edges != other.bin_edges up to numerical precision.
+        """
+
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
-        if self.vmin != other.vmin:
-            raise ValueError("other.vmin must equal self.vmin")
-        if self.vmax != other.vmax:
-            raise ValueError("other.vmax must equal self.vmax")
-        if self.num_atoms != other.num_atoms:
-            raise ValueError("other.num_atoms must equal self.num_atoms")
+        if not np.allclose(self.bin_edges, other.bin_edges, atol=1e-4, rtol=1e-4):
+            raise ValueError("input other.bin_edges must match self.bin_edges.")
 
         probs = np.zeros(dtype=self.probs.dtype, shape=[2 * self.num_atoms - 1])
         for i in range(0, len(self.atoms)):
