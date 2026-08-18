@@ -1,6 +1,6 @@
 import logging
 import math
-from enum import auto
+from typing import List
 from typing import Optional
 from typing import Union
 
@@ -102,6 +102,53 @@ class Histogram:
             num_atoms=num_atoms,
             probs=probs,
         )
+
+    @classmethod
+    def mixture(cls, hists: List["Histogram"], weights: List[float]) -> "Histogram":
+        """Create a mixture distribution from clusters and weights.
+
+        In detail, this creates a histogram for a random variable of the form
+        ```Y = i1 * X1 + ... + iN * XN```
+        where only one of ```i1, ..., iN``` is 1 and the rest are zero,
+        and the probability that ```ik == 1``` is ```weights[k]```,
+        and where the distribution of ```Xk``` is modeled by ```hists[k]```.
+
+        Args:
+            hists: List of Histograms serving as clusters for the mixture.
+                The Histograms are rebinned automatically to enable their mixture.
+            weights: List of floats serving as weights for the mixture.
+
+        Returns:
+            A new Histogram representing the mixture distribution.
+
+        Raises:
+            TypeError: If hists is not a list of Histograms.
+            TypeError: If weights is not a list of floats.
+            ValueError: If len(hists) != len(weights).
+            ValueError: If sum(weights) != 1.0.
+            ValueError: If min(weights) < 0.0.
+        """
+        if not isinstance(hists, list) or not isinstance(hists[0], Histogram):
+            raise TypeError("input 'hists' must be a list of Histograms.")
+        if not isinstance(weights, list) or not isinstance(weights[0], float):
+            raise TypeError("input 'weights' must be a list of floats.")
+        if len(hists) != len(weights):
+            raise ValueError("inputs 'hists' and 'weight' must have same length.")
+        if not np.allclose(sum(weights), 1.0):
+            raise ValueError("input 'weights' must sum to one.")
+        if min(weights) < 0.0:
+            raise ValueError("input 'weights' must be all non-negative.")
+
+        new_vmin = (min(h.vmin for h in hists),)
+        new_vmax = (max(h.vmax for h in hists),)
+        new_num_atoms = (math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5),)
+        spec = dict(
+            new_vmin=new_vmin,
+            new_vmax=new_vmax,
+            new_num_atoms=new_num_atoms,
+        )
+        hists = [h.rebin(**spec) for h in hists]
+        return Histogram._mix(hists, weights)
 
     @property
     def vmin(self):
@@ -655,26 +702,6 @@ class Histogram:
             probs=Histogram.renormalize(new_probs),
         )
 
-    @staticmethod
-    def renormalize(probs: np.ndarray) -> np.ndarray:
-        """Rectifies the inputted probabilities and renormalizes to unit sum,
-        counteracting small numerical errors.
-
-        Args:
-            probs: A numpy.ndarray containing the probabilities to renormalize.
-
-        Returns:
-            numpy.ndarray containing the renormalized probabilities.
-
-        Raises:
-            ValueError: If the rectified probabilities sum to zero.
-        """
-        probs = np.maximum(0.0, probs)
-        if np.allclose(np.sum(probs), 0.0):
-            raise ValueError("Rectified probabilities sum to zero.")
-        probs /= np.sum(probs, axis=-1)
-        return probs
-
     def shift(self, scalar: Union[int, float]) -> "Histogram":
         """Add a scalar to the histogram's random variable.
 
@@ -745,7 +772,6 @@ class Histogram:
             TypeError: If the inputted 'other' variable is not a Histogram.
             ValueError: If self.bin_edges != other.bin_edges up to numerical precision.
         """
-
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
         if not np.allclose(self.bin_edges, other.bin_edges, atol=1e-4, rtol=1e-4):
@@ -760,4 +786,51 @@ class Histogram:
             vmax=self.atom_max + other.atom_max + self.atom_stride / 2,
             num_atoms=2 * self.num_atoms - 1,
             probs=Histogram.renormalize(probs),
+        )
+
+    @staticmethod
+    def renormalize(probs: np.ndarray) -> np.ndarray:
+        """Rectifies the inputted probabilities and renormalizes to unit sum,
+        counteracting small numerical errors.
+
+        Args:
+            probs: A numpy.ndarray containing the probabilities to renormalize.
+
+        Returns:
+            numpy.ndarray containing the renormalized probabilities.
+
+        Raises:
+            ValueError: If the rectified probabilities sum to zero.
+        """
+        probs = np.maximum(0.0, probs)
+        if np.allclose(np.sum(probs), 0.0):
+            raise ValueError("Rectified probabilities sum to zero.")
+        probs /= np.sum(probs, axis=-1)
+        return probs
+
+    @staticmethod
+    def _mix(hists: List["Histogram"], weights: List[float]) -> "Histogram":
+        if not isinstance(hists, list) or not isinstance(hists[0], Histogram):
+            raise TypeError("input 'hists' must be a list of Histograms.")
+        if not isinstance(weights, list) or not isinstance(weights[0], float):
+            raise TypeError("input 'weights' must be a list of floats.")
+        if len(hists) != len(weights):
+            raise ValueError("inputs 'hists' and 'weight' must have same length.")
+        if not np.allclose(sum(weights), 1.0):
+            raise ValueError("input 'weights' must sum to one.")
+        if min(weights) < 0.0:
+            raise ValueError("input 'weights' must be all non-negative.")
+        if len(set(h.vmin for h in hists)) != 1:
+            raise ValueError("input 'hists' must have matching vmin.")
+        if len(set(h.vmax for h in hists)) != 1:
+            raise ValueError("input 'hists' must have matching vmax.")
+        if len(set(h.num_atoms for h in hists)) != 1:
+            raise ValueError("input 'hists' must have matching num_atoms.")
+
+        new_probs = sum(weights[i] * hists[i].probs for i in range(len(hists)))
+        return Histogram(
+            vmin=hists[0].vmin,
+            vmax=hists[0].vmax,
+            num_atoms=hists[0].num_atoms,
+            probs=Histogram.renormalize(new_probs),
         )
