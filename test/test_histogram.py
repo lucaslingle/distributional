@@ -85,6 +85,27 @@ def test_empirical_guard_clauses():
         unif_histogram(10).empirical(np.array([0.5, 0.1, 0.8]), num_atoms=0.1)
 
 
+def test_mixture_guard_clauses():
+    with pytest.raises(TypeError):
+        Histogram.mixture("str", [0.1, 0.9])
+    with pytest.raises(TypeError):
+        Histogram.mixture(["str", "str"], [0.1, 0.9])
+
+    with pytest.raises(TypeError):
+        Histogram.mixture([unif_histogram(2), alt_histogram(2)], "str")
+    with pytest.raises(TypeError):
+        Histogram.mixture([unif_histogram(2), alt_histogram(2)], [0, 1])
+
+    with pytest.raises(ValueError):
+        Histogram.mixture([unif_histogram(2), alt_histogram(2)], [1.0])
+
+    with pytest.raises(ValueError):
+        Histogram.mixture([unif_histogram(2), alt_histogram(2)], [0.1, 0.5])
+
+    with pytest.raises(ValueError):
+        Histogram.mixture([unif_histogram(2), alt_histogram(2)], [-0.1, 1.1])
+
+
 def test_add_guard_clauses():
     with pytest.raises(TypeError):
         unif_histogram(10) + "str"
@@ -136,6 +157,39 @@ def test_condition_guard_clauses():
         unif_histogram(10).condition(0.0, "str")
     with pytest.raises(ValueError):
         unif_histogram(10).condition(2.0, -2.0)
+
+
+def test_trim_guard_clauses():
+    with pytest.raises(TypeError):
+        unif_histogram(10).trim("str", 1.0)
+    with pytest.raises(TypeError):
+        unif_histogram(10).trim(0.0, "str")
+    with pytest.raises(ValueError):
+        unif_histogram(10).trim(2.0, -2.0)
+
+    """
+    >>> probs = [0.0, 0.0, 0.3, 0.7, 0.0, 0.0]
+    >>> atoms = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    >>> bins = [-0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+    >>>
+    >>> chop_start = bisect.bisect_left(bins[0:-1], 1.0)
+    >>> chop_start
+    2
+    >>> chop_end = bisect.bisect_right(bins[1:], 4.0)
+    >>> chop_end
+    4
+    """
+    h = Histogram(
+        vmin=-0.5,
+        vmax=5.5,
+        num_atoms=6,
+        probs=np.array([0.0, 0.0, 0.3, 0.7, 0.0, 0.0]),
+    )
+    with pytest.raises(ValueError):
+        h.trim(2.0, 5.5)
+    with pytest.raises(ValueError):
+        h.trim(-0.5, 3.0)
+    h.trim(1.0, 4.0)  # should pass wo error
 
 
 def test_pad_guard_clauses():
@@ -245,7 +299,7 @@ def test_mix_guard_clauses():
         Histogram._mix(
             [
                 Histogram(0.0, 1.0, 2, unif_probs(2)),
-                Histogram(0.0, 1.0, 10, unif_probs(2)),
+                Histogram(0.0, 1.0, 10, unif_probs(10)),
             ],
             [0.1, 0.9],
         )
@@ -257,6 +311,11 @@ def test_empirical_return():
 
     h = Histogram.empirical(np.array([0.0, 0.7, 1.0]), num_atoms=2)
     np.testing.assert_allclose(h.probs, np.array([1 / 3, 2 / 3]), **TOLS)
+
+
+def test_mixture_return():
+    h = Histogram.mixture([unif_histogram(2), alt_histogram(2)], [0.5, 0.5])
+    assert type(h) == Histogram
 
 
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
@@ -416,7 +475,7 @@ def test_sample_return(samples):
     assert h.sample(samples, None).shape == (samples,)
 
 
-def test_histogram_condition():
+def test_condition():
     h = unif_histogram(2)
     hc1 = h.condition(-float("inf"), 0.5)
     np.testing.assert_allclose(hc1.probs, np.array([1.0, 0.0]), **TOLS)
@@ -462,15 +521,31 @@ def test_pad(hist, n):
     np.testing.assert_allclose(hp.probs[(n + 1) :], 0.0)
 
 
+@pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6])
+def test_trim(hist, n):
+    # numerics not so good for large n = 10, 100,
+    # sometimes the bins are like -2e-16
+    # when they should be zero, and the left bin is dropped on trim.
+
+    h = hist(n)
+    hp = h.pad(-1.0, 1.0)
+    print(hp.probs)
+    print(hp.bin_edges)
+    print(hp.atom_stride)
+    ht = hp.trim(0.0, 1.0)
+    assert h == ht
+
+
 @pytest.mark.parametrize("hist, probs", [(unif_histogram, unif_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(2, 3), (3, 2)])
-def test_histogram_rebin_unaligned_unif(hist, probs, start_n, end_n):
+def test_rebin_unaligned_unif(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0.0, 1.0, end_n)
     np.testing.assert_allclose(h.probs, probs(end_n), **TOLS)
 
 
-def test_histogram_rebin_unaligned_alt():
+def test_rebin_unaligned_alt():
     h = alt_histogram(2)
     h = h.rebin(0.0, 1.0, 3)
     np.testing.assert_allclose(h.probs, np.array([2 / 3, 1 / 3, 0 / 3]), **TOLS)
@@ -482,7 +557,7 @@ def test_histogram_rebin_unaligned_alt():
 
 @pytest.mark.parametrize("hist, probs", [(unif_histogram, unif_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(10, 100), (100, 10)])
-def test_histogram_rebin_aligned_unif(hist, probs, start_n, end_n):
+def test_rebin_aligned_unif(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0.0, 1.0, end_n)
     np.testing.assert_allclose(h.probs, probs(end_n), **TOLS)
@@ -490,7 +565,7 @@ def test_histogram_rebin_aligned_unif(hist, probs, start_n, end_n):
 
 @pytest.mark.parametrize("hist, probs", [(alt_histogram, alt_probs)])
 @pytest.mark.parametrize("start_n, end_n", [(10, 20), (10, 100), (20, 10), (100, 10)])
-def test_histogram_rebin_aligned_alt(hist, probs, start_n, end_n):
+def test_rebin_aligned_alt(hist, probs, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0.0, 1.0, end_n)
     np.testing.assert_allclose(h.probs, probs(end_n, end_n // start_n), **TOLS)
@@ -498,7 +573,7 @@ def test_histogram_rebin_aligned_alt(hist, probs, start_n, end_n):
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram, wobbly_histogram])
 @pytest.mark.parametrize("start_n, end_n", [(10, 20), (10, 100), (20, 10), (100, 10)])
-def test_histogram_rebin_idempotent(hist, start_n, end_n):
+def test_rebin_idempotent(hist, start_n, end_n):
     h = hist(start_n)
     h = h.rebin(0.0, 1.0, end_n)
     h2 = h.rebin(0.0, 1.0, end_n)
@@ -512,14 +587,14 @@ def test_shift_return():
 
 @pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6, 10, 100])
-def test_histogram_convolve(hist, n):
+def test_convolve(hist, n):
     h = hist(n)
     hc = h.convolve(h)
     hcs = h.convolve_slow(h)
     np.testing.assert_allclose(hc.probs, hcs.probs, **TOLS)
 
 
-def test_histogram_mix():
+def test_mix():
     h1 = Histogram(0.0, 1.0, 2, np.array([0.5, 0.5]))
     h2 = Histogram(0.0, 1.0, 2, np.array([0.5, 0.5]))
     assert Histogram._mix([h1, h2], [0.2, 0.8]) == h1

@@ -1,3 +1,4 @@
+import bisect
 import logging
 import math
 from typing import List
@@ -105,13 +106,14 @@ class Histogram:
 
     @classmethod
     def mixture(cls, hists: List["Histogram"], weights: List[float]) -> "Histogram":
-        """Create a mixture distribution from clusters and weights.
+        f"""Create a mixture distribution from clusters and weights.
 
         In detail, this creates a histogram for a random variable of the form
         ```Y = i1 * X1 + ... + iN * XN```
         where only one of ```i1, ..., iN``` is 1 and the rest are zero,
         and the probability that ```ik == 1``` is ```weights[k]```,
-        and where the distribution of ```Xk``` is modeled by ```hists[k]```.
+        and where the distribution of each ```Xk``` is modeled by ```hists[k]```,
+        and is independent of i1, ..., iN.
 
         Args:
             hists: List of Histograms serving as clusters for the mixture.
@@ -554,7 +556,8 @@ class Histogram:
         )
 
     def pad(self, left: float, right: float, extra: bool = False) -> "Histogram":
-        """Pad the histogram with zero-mass bins until the outer edges exceed the range given.
+        """Pad the histogram with zero-mass bins until the outer edges
+        exceed the range given.
 
         Args:
             left: Left pad target.
@@ -563,13 +566,19 @@ class Histogram:
                 beyond what is needed to cover the range specified. Defaults to False.
 
         Returns:
-            New Histogram whose atoms minimally contain the range [left, right].
+            New Histogram whose bins minimally contain the range [left, right].
 
         Raises:
+            TypeError: If left is not int or float.
+            TypeError: If right is not int or float.
             ValueError: If left >= right.
             ValueError: If self.vmin < left.
             ValueError: If right < self.vmax.
         """
+        if not isinstance(left, int) and not isinstance(left, float):
+            raise TypeError("input 'left' must be int or float.")
+        if not isinstance(right, int) and not isinstance(right, float):
+            raise TypeError("input 'right' must be int or float.")
         if left >= right:
             raise ValueError("input 'left' must be less than 'right'.")
         if self.vmin < left:
@@ -631,6 +640,55 @@ class Histogram:
             vmax=vmax,
             num_atoms=atoms.shape[0],
             probs=probs,
+        )
+
+    def trim(self, left: float, right: float) -> "Histogram":
+        """Trim the histogram of zero-mass bins until the outer edges
+        are contained within the range given.
+
+        Calling ```trim``` after ```pad``` on a histogram with a large number of atoms
+        relative to the range of values may cause numerical errors in bin edge calculation.
+        In this case, you may need to expand ```left``` and ```right```
+        by a small amount (e.g., less than the atom stride), versus the original
+        vmin and vmax values used prior to padding, to avoid triggering an error
+        for slicing nonzero probability mass.
+
+        Args:
+            left: Left trim target.
+            right: Right trim target.
+
+        Returns:
+            New Histogram instance whose bins maximally lie within [left, right].
+
+        Raises:
+            TypeError: If left is not int or float.
+            TypeError: If right is not int or float.
+            ValueError: If left >= right.
+            ValueError: If nonzero probability mass is requested trimmed.
+        """
+        if not isinstance(left, int) and not isinstance(left, float):
+            raise TypeError("input 'left' must be int or float.")
+        if not isinstance(right, int) and not isinstance(right, float):
+            raise TypeError("input 'right' must be int or float.")
+        if left >= right:
+            raise ValueError("input 'left' must be less than 'right'.")
+
+        chop_start = bisect.bisect_left(self.bin_edges[0:-1], left)
+        print(f"chop_start: {chop_start}")
+        chop_end = bisect.bisect_right(self.bin_edges[1:], right)
+        print(f"chop_end: {chop_end}")
+        if chop_start > 0 and max(self.probs[0:chop_start]) > 0:
+            raise ValueError("input 'left' slices nonzero probability mass.")
+        if chop_end < self.num_atoms and max(self.probs[chop_end:]) > 0:
+            raise ValueError("input 'right' slices nonzero probability mass.")
+
+        if chop_end == self.num_atoms:
+            chop_end = None
+        return Histogram(
+            vmin=self.bin_edges[0:-1][chop_start],
+            vmax=self.bin_edges[1:][chop_end or -1],
+            num_atoms=self.atoms[chop_start:chop_end].shape[0],
+            probs=self.probs[chop_start:chop_end],
         )
 
     def rebin(
