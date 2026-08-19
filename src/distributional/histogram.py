@@ -674,9 +674,7 @@ class Histogram:
             raise ValueError("input 'left' must be less than 'right'.")
 
         chop_start = bisect.bisect_left(self.bin_edges[0:-1], left)
-        print(f"chop_start: {chop_start}")
         chop_end = bisect.bisect_right(self.bin_edges[1:], right)
-        print(f"chop_end: {chop_end}")
         if chop_start > 0 and max(self.probs[0:chop_start]) > 0:
             raise ValueError("input 'left' slices nonzero probability mass.")
         if chop_end < self.num_atoms and max(self.probs[chop_end:]) > 0:
