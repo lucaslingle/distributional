@@ -209,7 +209,7 @@ class Histogram:
         ls = []
         probs = self.probs
         for i in range(self.num_atoms):
-            if not np.allclose(probs[i], 0.0):
+            if probs[i] > 0.0:
                 ls.append(i)
         return ls
 
