@@ -521,7 +521,7 @@ def test_pad(hist, n):
     np.testing.assert_allclose(hp.probs[(n + 1) :], 0.0)
 
 
-@pytest.mark.parametrize("hist", [unif_histogram, alt_histogram])
+@pytest.mark.parametrize("hist", [unif_histogram, wobbly_histogram])
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6])
 def test_trim(hist, n):
     # numerics not so good for large n = 10, 100,
@@ -533,7 +533,15 @@ def test_trim(hist, n):
     print(hp.probs)
     print(hp.bin_edges)
     print(hp.atom_stride)
-    ht = hp.trim(0.0, 1.0)
+    ht = hp.trim()
+    assert h == ht
+
+    h = hist(n)
+    hp = h.pad(0.0, 2.0)
+    print(hp.probs)
+    print(hp.bin_edges)
+    print(hp.atom_stride)
+    ht = hp.trim()
     assert h == ht
 
 
