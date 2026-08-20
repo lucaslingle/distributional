@@ -142,6 +142,7 @@ class Histogram:
         if min(weights) < 0.0:
             raise ValueError("input 'weights' must be all non-negative.")
 
+        hists = [h.trim() for h in hists]
         new_vmin = min(h.vmin for h in hists)
         new_vmax = max(h.vmax for h in hists)
         new_num_atoms = math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5)
@@ -309,6 +310,8 @@ class Histogram:
         if isinstance(other, int) or isinstance(other, float):
             return self.shift(other)
         if isinstance(other, Histogram):
+            h1 = self.trim()
+            h2 = other.trim()
             spec = dict(
                 new_vmin=min(self.vmin, other.vmin),
                 new_vmax=max(self.vmax, other.vmax),
@@ -316,7 +319,9 @@ class Histogram:
                     (self.num_atoms**2 + other.num_atoms**2) ** 0.5
                 ),
             )
-            return self.rebin(**spec).convolve(other.rebin(**spec))
+            h1 = h1.rebin(**spec)
+            h2 = h2.rebin(**spec)
+            return h1.convolve(h2)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def __mul__(self, other: Union[int, float]) -> "Histogram":
@@ -734,7 +739,10 @@ class Histogram:
         )
 
     def rebin(
-        self, new_vmin: float, new_vmax: float, new_num_atoms: int
+        self,
+        new_vmin: Optional[float],
+        new_vmax: Optional[float],
+        new_num_atoms: Optional[int],
     ) -> "Histogram":
         """Rebin the histogram.
 
@@ -743,8 +751,11 @@ class Histogram:
 
         Args:
             new_vmin: Minimum permitted value for the new histogram's random variable.
+                If None, uses current self.vmin.
             new_vmax: Maximum permitted value for the new histogram's random variable.
+                If None, uses current self.vmax.
             new_num_atoms: Number of bins for the new histogram.
+                If None, uses current self.num_atoms.
 
         Returns:
             A new Histogram instance with the rebinned probability mass.
@@ -755,6 +766,13 @@ class Histogram:
             RuntimeError: If the algorithm does not function as expected.
                 This should never occur.
         """
+        if new_vmin is None:
+            new_vmin = self.vmin
+        if new_vmax is None:
+            new_vmax = self.vmax
+        if new_num_atoms is None:
+            new_num_atoms = self.num_atoms
+
         old_padded = self.pad(new_vmin, new_vmax, extra=True)
         old_probs = old_padded.probs
         old_edges = old_padded.bin_edges
