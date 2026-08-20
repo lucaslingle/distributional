@@ -739,7 +739,10 @@ class Histogram:
         )
 
     def rebin(
-        self, new_vmin: float, new_vmax: float, new_num_atoms: int
+        self,
+        new_vmin: Optional[float],
+        new_vmax: Optional[float],
+        new_num_atoms: Optional[int],
     ) -> "Histogram":
         """Rebin the histogram.
 
@@ -748,8 +751,11 @@ class Histogram:
 
         Args:
             new_vmin: Minimum permitted value for the new histogram's random variable.
+                If None, uses current self.vmin.
             new_vmax: Maximum permitted value for the new histogram's random variable.
+                If None, uses current self.vmax.
             new_num_atoms: Number of bins for the new histogram.
+                If None, uses current self.num_atoms.
 
         Returns:
             A new Histogram instance with the rebinned probability mass.
@@ -760,6 +766,13 @@ class Histogram:
             RuntimeError: If the algorithm does not function as expected.
                 This should never occur.
         """
+        if new_vmin is None:
+            new_vmin = self.vmin
+        if new_vmax is None:
+            new_vmax = self.vmax
+        if new_num_atoms is None:
+            new_num_atoms = self.num_atoms
+
         old_padded = self.pad(new_vmin, new_vmax, extra=True)
         old_probs = old_padded.probs
         old_edges = old_padded.bin_edges
