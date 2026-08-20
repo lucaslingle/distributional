@@ -3,6 +3,7 @@ import logging
 import math
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 
 import matplotlib.pyplot as plt
@@ -202,6 +203,25 @@ class Histogram:
         return output
 
     @property
+    def support(self) -> List[int]:
+        """List[int]: Lists the bin indices with nonzero probability."""
+        ls = []
+        probs = self.probs
+        for i in range(self.num_atoms):
+            if probs[i] > 0.0:
+                ls.append(i)
+        return ls
+
+    @property
+    def extrema(self) -> Tuple[float, float]:
+        """Tuple[float, float]: The left edge of the leftmost bin with nonzero probability mass,
+        and the right edge of the rightmost bin with nonzero probability mass.
+        """
+        supp = self.support
+        edges = self.bin_edges
+        return edges[0:-1][supp[0]], edges[1:][supp[-1]]
+
+    @property
     def expectation(self) -> float:
         """float: The expectation (mean) of the histogram."""
         return np.sum(self.atoms * self.probs, axis=-1)
@@ -247,9 +267,9 @@ class Histogram:
             True if both instances are equal, up to numerical errors.
             False otherwise.
         """
-        if self.vmin != other.vmin:
+        if not np.allclose(self.vmin, other.vmin):
             return False
-        if self.vmax != other.vmax:
+        if not np.allclose(self.vmax, other.vmax):
             return False
         if self.num_atoms != other.num_atoms:
             return False
@@ -642,7 +662,9 @@ class Histogram:
             probs=probs,
         )
 
-    def trim(self, left: float, right: float) -> "Histogram":
+    def trim(
+        self, left: Optional[float] = None, right: Optional[float] = None
+    ) -> "Histogram":
         """Trim the histogram of zero-mass bins until the outer edges
         are contained within the range given.
 
@@ -654,8 +676,8 @@ class Histogram:
         for slicing nonzero probability mass.
 
         Args:
-            left: Left trim target.
-            right: Right trim target.
+            left: Left trim target. If None, uses self.extrema[0]. Default value None.
+            right: Right trim target. If None, uses self.extrema[1]. Default value None.
 
         Returns:
             New Histogram instance whose bins maximally lie within [left, right].
@@ -666,27 +688,49 @@ class Histogram:
             ValueError: If left >= right.
             ValueError: If nonzero probability mass is requested trimmed.
         """
-        if not isinstance(left, int) and not isinstance(left, float):
+        if (
+            left is not None
+            and not isinstance(left, int)
+            and not isinstance(left, float)
+        ):
             raise TypeError("input 'left' must be int or float.")
-        if not isinstance(right, int) and not isinstance(right, float):
+        if (
+            right is not None
+            and not isinstance(right, int)
+            and not isinstance(right, float)
+        ):
             raise TypeError("input 'right' must be int or float.")
-        if left >= right:
+        if left is not None and right is not None and left >= right:
             raise ValueError("input 'left' must be less than 'right'.")
+        extrema = self.extrema
+        if left is None:
+            left = extrema[0]
+        if right is None:
+            right = extrema[1]
+        logging.debug(f"left: {left}")
+        logging.debug(f"right: {right}")
 
         chop_start = bisect.bisect_left(self.bin_edges[0:-1], left)
         chop_end = bisect.bisect_right(self.bin_edges[1:], right)
+        logging.debug(f"chop_start: {chop_start}")
+        logging.debug(f"chop_end: {chop_end}")
+
         if chop_start > 0 and max(self.probs[0:chop_start]) > 0:
             raise ValueError("input 'left' slices nonzero probability mass.")
         if chop_end < self.num_atoms and max(self.probs[chop_end:]) > 0:
             raise ValueError("input 'right' slices nonzero probability mass.")
 
+        new_vmin = self.bin_edges[0:-1][chop_start]
+        new_vmax = self.bin_edges[1:][chop_end - 1]
         if chop_end == self.num_atoms:
             chop_end = None
+        new_num_atoms = self.atoms[chop_start:chop_end].shape[0]
+        new_probs = self.probs[chop_start:chop_end]
         return Histogram(
-            vmin=self.bin_edges[0:-1][chop_start],
-            vmax=self.bin_edges[1:][chop_end or -1],
-            num_atoms=self.atoms[chop_start:chop_end].shape[0],
-            probs=self.probs[chop_start:chop_end],
+            vmin=new_vmin,
+            vmax=new_vmax,
+            num_atoms=new_num_atoms,
+            probs=new_probs,
         )
 
     def rebin(
