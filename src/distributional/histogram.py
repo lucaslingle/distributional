@@ -310,6 +310,8 @@ class Histogram:
         if isinstance(other, int) or isinstance(other, float):
             return self.shift(other)
         if isinstance(other, Histogram):
+            h1 = self.trim()
+            h2 = other.trim()
             spec = dict(
                 new_vmin=min(self.vmin, other.vmin),
                 new_vmax=max(self.vmax, other.vmax),
@@ -317,7 +319,9 @@ class Histogram:
                     (self.num_atoms**2 + other.num_atoms**2) ** 0.5
                 ),
             )
-            return self.trim().rebin(**spec).convolve(other.trim().rebin(**spec))
+            h1 = h1.rebin(**spec)
+            h2 = h2.rebin(**spec)
+            return h1.convolve(h2)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def __mul__(self, other: Union[int, float]) -> "Histogram":
