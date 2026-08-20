@@ -142,6 +142,7 @@ class Histogram:
         if min(weights) < 0.0:
             raise ValueError("input 'weights' must be all non-negative.")
 
+        hists = [h.trim() for h in hists]
         new_vmin = min(h.vmin for h in hists)
         new_vmax = max(h.vmax for h in hists)
         new_num_atoms = math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5)
@@ -316,7 +317,7 @@ class Histogram:
                     (self.num_atoms**2 + other.num_atoms**2) ** 0.5
                 ),
             )
-            return self.rebin(**spec).convolve(other.rebin(**spec))
+            return self.trim().rebin(**spec).convolve(other.trim().rebin(**spec))
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
     def __mul__(self, other: Union[int, float]) -> "Histogram":
