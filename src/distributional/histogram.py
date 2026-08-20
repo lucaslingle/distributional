@@ -580,13 +580,15 @@ class Histogram:
             probs=Histogram.renormalize(probs),
         )
 
-    def pad(self, left: float, right: float, extra: bool = False) -> "Histogram":
+    def pad(
+        self, left: Optional[float], right: Optional[float], extra: bool = False
+    ) -> "Histogram":
         """Pad the histogram with zero-mass bins until the outer edges
         exceed the range given.
 
         Args:
-            left: Left pad target.
-            right: Right pad target.
+            left: Left pad target. If None, uses self.vmin.
+            right: Right pad target. If None, uses self.vmax.
             extra: Adds one extra atom to each side of the new histogram,
                 beyond what is needed to cover the range specified. Defaults to False.
 
@@ -600,12 +602,25 @@ class Histogram:
             ValueError: If self.vmin < left.
             ValueError: If right < self.vmax.
         """
-        if not isinstance(left, int) and not isinstance(left, float):
+        if (
+            left is not None
+            and not isinstance(left, int)
+            and not isinstance(left, float)
+        ):
             raise TypeError("input 'left' must be int or float.")
-        if not isinstance(right, int) and not isinstance(right, float):
+        if (
+            right is not None
+            and not isinstance(right, int)
+            and not isinstance(right, float)
+        ):
             raise TypeError("input 'right' must be int or float.")
-        if left >= right:
+        if left is not None and right is not None and left >= right:
             raise ValueError("input 'left' must be less than 'right'.")
+        if left is None:
+            left = self.vmin
+        if right is None:
+            right = self.vmax
+
         if self.vmin < left:
             raise ValueError(
                 f"missing left bin coverage of old distribution: (old_vmin < left), ({self.vmin} < {left})"

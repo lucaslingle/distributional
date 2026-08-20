@@ -520,6 +520,9 @@ def test_pad(hist, n):
     np.testing.assert_allclose(hp.probs[1 : (n + 1)], h.probs)
     np.testing.assert_allclose(hp.probs[(n + 1) :], 0.0)
 
+    hp = h.pad(None, None, extra=False)
+    assert hp == h
+
 
 @pytest.mark.parametrize("hist", [unif_histogram, wobbly_histogram])
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 6])
