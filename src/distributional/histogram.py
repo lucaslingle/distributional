@@ -17,7 +17,7 @@ class Histogram:
         vmax: Union[int, float],
         num_atoms: int,
         probs: np.ndarray,
-    ) -> None:
+    ) -> "Histogram":
         """Histogram class to represent the distribution of a one-dimensional random variable.
 
         Args:
@@ -522,14 +522,19 @@ class Histogram:
         """Conditions the random variable as being in an interval ```(left, right)```.
 
         Internally, this method zeros out probability mass outside the range and renormalizes.
-        If the interval divides a bin, the corresponding fraction of the bin's probability mass will kept.
+        If the interval divides a bin, the corresponding fraction of the bin's probability mass will be kept.
 
         Args:
             left: Low bound for the random variable. Default value -float('inf').
             right: High bound for the random variable. Default value float('inf').
 
-        Return:
-            New Histogram representing conditional distribution of random variable.
+        Returns:
+            New ```Histogram``` representing conditional distribution of random variable.
+
+        Raises:
+            TypeError: If ```left``` is not ```int``` or ```float``` type.
+            TypeError: If ```right``` is not ```int``` or ```float``` type.
+            ValueError: If ```left >= right```.
         """
         if not isinstance(left, int) and not isinstance(left, float):
             raise TypeError("input 'left' must be int or float type.")

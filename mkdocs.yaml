@@ -1,7 +1,8 @@
-site_name: Distributional Docs
+site_name: Distributional
+site_url: https://distributional.readthedocs.io
 
 theme:
-  name: mkdocs
+  name: readthedocs
 
 plugins:
   - search
