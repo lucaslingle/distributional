@@ -17,7 +17,7 @@ class Histogram:
         vmax: Union[int, float],
         num_atoms: int,
         probs: np.ndarray,
-    ) -> None:
+    ) -> "Histogram":
         """Histogram class to represent the distribution of a one-dimensional random variable.
 
         Args:
@@ -27,18 +27,18 @@ class Histogram:
             probs: Probabilities for the bins in the histogram.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If vmin is not an int or float.
-            TypeError: If vmax is not an int or float.
-            TypeError: If num_atoms is not an int.
-            TypeError: If probs is not a numpy.ndarray.
-            ValueError: If vmin >= vmax.
-            ValueError: If num_atoms <= 0.
-            ValueError: If probs.shape is not equal to (num_atoms,).
-            ValueError: If probs contains negative values.
-            ValueError: If probs does not sum to one.
+            TypeError: If ```vmin``` is not an ```int``` or ```float```.
+            TypeError: If ```vmax``` is not an ```int``` or ```float```.
+            TypeError: If ```num_atoms``` is not an ```int```.
+            TypeError: If ```probs``` is not a ```numpy.ndarray```.
+            ValueError: If ```vmin >= vmax```.
+            ValueError: If ```num_atoms <= 0```.
+            ValueError: If ```probs.shape != (num_atoms,)```.
+            ValueError: If ```probs``` contains negative values.
+            ValueError: If ```probs``` does not sum to one.
         """
         if not isinstance(vmin, int) and not isinstance(vmin, float):
             raise TypeError("input 'vmin' must be int or float type.")
@@ -66,7 +66,7 @@ class Histogram:
 
     @classmethod
     def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
-        """Create a histogram instance fit to the data.
+        """Create a Histogram instance fit to the data.
 
         Args:
             vs: A numpy.ndarray of shape (n,) containing the data.
@@ -74,11 +74,11 @@ class Histogram:
                 Default value is None.
 
         Returns:
-            A new Histogram instance describing the data.
+            A new ```Histogram``` instance describing the data.
 
         Raises:
-            ValueError: If data array is not one-dimensional.
-            TypeError: If num_atoms is not int and not None.
+            ValueError: If ```vs``` is not one-dimensional.
+            TypeError: If ```num_atoms``` is not ```int``` and not ```None```.
         """
         if len(vs.shape) != 1:
             raise ValueError("Only 1-dimensional data is supported.")
@@ -107,14 +107,7 @@ class Histogram:
 
     @classmethod
     def mixture(cls, hists: List["Histogram"], weights: List[float]) -> "Histogram":
-        f"""Create a mixture distribution from clusters and weights.
-
-        In detail, this creates a histogram for a random variable of the form
-        ```Y = i1 * X1 + ... + iN * XN```
-        where only one of ```i1, ..., iN``` is 1 and the rest are zero,
-        and the probability that ```ik == 1``` is ```weights[k]```,
-        and where the distribution of each ```Xk``` is modeled by ```hists[k]```,
-        and is independent of i1, ..., iN.
+        """Create a Histogram for random variable ```Y = i1 * X1 + ... + iN * XN``` where one of ```i1, ..., iN``` is 1 and the rest 0, the probability that ```ik == 1``` is ```weights[k]```, and the distribution of ```Xk``` is modeled by ```hists[k]``` and is independent of ```i1, ..., iN```.
 
         Args:
             hists: List of Histograms serving as clusters for the mixture.
@@ -122,14 +115,14 @@ class Histogram:
             weights: List of floats serving as weights for the mixture.
 
         Returns:
-            A new Histogram representing the mixture distribution.
+            A new ```Histogram``` representing the mixture distribution.
 
         Raises:
-            TypeError: If hists is not a list of Histograms.
-            TypeError: If weights is not a list of floats.
-            ValueError: If len(hists) != len(weights).
-            ValueError: If sum(weights) != 1.0.
-            ValueError: If min(weights) < 0.0.
+            TypeError: If ```hists``` is not a list of ```Histogram```s.
+            TypeError: If ```weights``` is not a list of ```float```s.
+            ValueError: If ```len(hists) != len(weights)```.
+            ValueError: If ```sum(weights) != 1.0```.
+            ValueError: If ```min(weights) < 0.0```.
         """
         if not isinstance(hists, list) or not isinstance(hists[0], Histogram):
             raise TypeError("input 'hists' must be a list of Histograms.")
@@ -235,7 +228,7 @@ class Histogram:
 
     @property
     def median(self) -> float:
-        """float: The median of the histogram, alias for self.inverse_cdf(0.5)."""
+        """float: The median of the histogram, alias for ```inverse_cdf(0.5)```."""
         return self.inverse_cdf(0.5)
 
     @property
@@ -265,8 +258,7 @@ class Histogram:
             rtol: Relative error tolerance for probability comparison.
 
         Returns:
-            True if both instances are equal, up to numerical errors.
-            False otherwise.
+            A boolean indicating if both instances are equal, up to numerical errors.
         """
         if not np.allclose(self.vmin, other.vmin):
             return False
@@ -282,8 +274,7 @@ class Histogram:
         """A string representation of the Histogram object.
 
         Returns:
-            A string containing information about vmin, vmax, num_atoms,
-                and the ```__repr__``` of self.probs.
+            A string containing information about ```vmin```, ```vmax```, ```num_atoms```, and ```probs```.
         """
         ls = []
         ls.append("Histogram(\n")
@@ -301,11 +292,10 @@ class Histogram:
             other: An int, float, or Histogram instance.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int, float, or Histogram.
-            ValueError: If other is a Histogram with different bins than self.
+            TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
         if isinstance(other, int) or isinstance(other, float):
             return self.shift(other)
@@ -331,10 +321,10 @@ class Histogram:
             other: An int or float.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int or float.
+            TypeError: If ```other``` is not an ```int``` or ```float```.
         """
         if not isinstance(other, int) and not isinstance(other, float):
             raise TypeError("input 'coef' must be int or float type.")
@@ -361,11 +351,10 @@ class Histogram:
             other: An int, float, or Histogram instance.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int, float, or Histogram.
-            ValueError: If other is a Histogram with different bins than self.
+            TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
         if (
             isinstance(other, int)
@@ -382,11 +371,10 @@ class Histogram:
             other: An int, float, or Histogram instance.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int, float, or Histogram.
-            ValueError: If other is a Histogram with different bins than self.
+            TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
         return self.__add__(other)
 
@@ -397,10 +385,10 @@ class Histogram:
             other: An int or float.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int or float.
+            TypeError: If ```other``` is not an ```int``` or ```float```.
         """
         return self.__mul__(other)
 
@@ -414,8 +402,7 @@ class Histogram:
             A new Histogram instance representing the distribution of the new variable.
 
         Raises:
-            TypeError: If other is not an int, float, or Histogram.
-            ValueError: If other is a Histogram with different bins than self.
+            TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
         return self.__sub__(other).__mul__(-1)
 
@@ -434,16 +421,16 @@ class Histogram:
         """Evaluate the cumulative distribution function at particular point.
 
         Evaluating at points between histogram bin edges will include a fraction of the containing bin's probability mass.
-        Points less than self.vmin or more than self.vmax are allowed, and return 0.0 or 1.0, respectively.
+        Points less than ```vmin``` or more than ```vmax``` are allowed, and return ```0.0``` or ```1.0```, respectively.
 
         Args:
             v: The point to evaluate the CDF at.
 
         Returns:
-            The probability of a sample being less than or equal to v.
+            The probability of a sample being less than or equal to ```v```.
 
         Raises:
-            TypeError: if v is not an int or float.
+            TypeError: If ```v``` is not an ```int``` or ```float```.
         """
         if not isinstance(v, int) and not isinstance(v, float):
             raise TypeError("Input 'v' must be of type int or float.")
@@ -468,8 +455,8 @@ class Histogram:
     def inverse_cdf(self, p: float) -> float:
         """Evaluate the inverse of the cumulative distribution function at a particular point.
 
-        Implemented so that if self.probs is all nonzero, self.inverse_cdf(self.cdf(v)) == v
-        for any v between self.vmin and self.vmax. This means probability values between
+        Implemented so that if ```probs``` is all nonzero, ```inverse_cdf(cdf(v)) == v```
+        for any v between ```vmin``` and ```vmax```. This means probability values between
         bin increments are assigned to sample space based on their distance to the increments.
 
         Args:
@@ -479,8 +466,8 @@ class Histogram:
             The value in the sample space corresponding to the cumulative probability given.
 
         Raises:
-            TypeError: If p is not an int or float type.
-            ValueError: If p is not between 0 and 1, inclusive.
+            TypeError: If ```p``` is not an ```int``` or ```float``` type.
+            ValueError: If ```p``` is not between 0 and 1, inclusive.
         """
         if not isinstance(p, int) and not isinstance(p, float):
             raise TypeError("Input 'p' must be of type int or float.")
@@ -511,11 +498,11 @@ class Histogram:
                  If omitted, uses numpy's legacy global RNG. Default value is None.
 
         Returns:
-            A numpy.ndarray with shape (n,) containing the samples.
+            A ```numpy.ndarray``` with shape ```(n,)``` containing the samples.
 
         Raises:
-            TypeError: If input n is not an int.
-            TypeError: If input rng is not numpy.random.Generator or None.
+            TypeError: If input ```n``` is not an ```int```.
+            TypeError: If input ```rng``` is not ```numpy.random.Generator``` or ```None```.
         """
         if not isinstance(n, int):
             raise TypeError("Input 'n' must be an int.")
@@ -532,17 +519,22 @@ class Histogram:
     def condition(
         self, left: float = -float("inf"), right: float = float("inf")
     ) -> "Histogram":
-        """Conditions the random variable as being in an interval (left, right).
+        """Conditions the random variable as being in an interval ```(left, right)```.
 
         Internally, this method zeros out probability mass outside the range and renormalizes.
-        If the interval divides a bin, the corresponding fraction of the bin's probability mass will kept.
+        If the interval divides a bin, the corresponding fraction of the bin's probability mass will be kept.
 
         Args:
             left: Low bound for the random variable. Default value -float('inf').
             right: High bound for the random variable. Default value float('inf').
 
-        Return:
-            New Histogram representing conditional distribution of random variable.
+        Returns:
+            New ```Histogram``` representing conditional distribution of random variable.
+
+        Raises:
+            TypeError: If ```left``` is not ```int``` or ```float``` type.
+            TypeError: If ```right``` is not ```int``` or ```float``` type.
+            ValueError: If ```left >= right```.
         """
         if not isinstance(left, int) and not isinstance(left, float):
             raise TypeError("input 'left' must be int or float type.")
@@ -587,20 +579,20 @@ class Histogram:
         exceed the range given.
 
         Args:
-            left: Left pad target. If None, uses self.vmin.
-            right: Right pad target. If None, uses self.vmax.
+            left: Left pad target. If None, uses vmin.
+            right: Right pad target. If None, uses vmax.
             extra: Adds one extra atom to each side of the new histogram,
                 beyond what is needed to cover the range specified. Defaults to False.
 
         Returns:
-            New Histogram whose bins minimally contain the range [left, right].
+            New Histogram whose bins minimally contain the range ```[left, right]```.
 
         Raises:
-            TypeError: If left is not int or float.
-            TypeError: If right is not int or float.
-            ValueError: If left >= right.
-            ValueError: If self.vmin < left.
-            ValueError: If right < self.vmax.
+            TypeError: If ```left``` is not ```int``` or ```float```.
+            TypeError: If ```right``` is not ```int``` or ```float```.
+            ValueError: If ```left >= right```.
+            ValueError: If ```vmin < left```.
+            ValueError: If ```right < vmax```.
         """
         if (
             left is not None
@@ -688,24 +680,17 @@ class Histogram:
         """Trim the histogram of zero-mass bins until the outer edges
         are contained within the range given.
 
-        Calling ```trim``` after ```pad``` on a histogram with a large number of atoms
-        relative to the range of values may cause numerical errors in bin edge calculation.
-        In this case, you may need to expand ```left``` and ```right```
-        by a small amount (e.g., less than the atom stride), versus the original
-        vmin and vmax values used prior to padding, to avoid triggering an error
-        for slicing nonzero probability mass.
-
         Args:
-            left: Left trim target. If None, uses self.extrema[0]. Default value None.
-            right: Right trim target. If None, uses self.extrema[1]. Default value None.
+            left: Left trim target. If None, uses extrema[0]. Default value None.
+            right: Right trim target. If None, uses extrema[1]. Default value None.
 
         Returns:
-            New Histogram instance whose bins maximally lie within [left, right].
+            New Histogram instance whose bins maximally lie within ```[left, right]```.
 
         Raises:
-            TypeError: If left is not int or float.
-            TypeError: If right is not int or float.
-            ValueError: If left >= right.
+            TypeError: If ```left``` is not ```int``` or ```float```.
+            TypeError: If ```right``` is not ```int``` or ```float```.
+            ValueError: If ```left >= right```.
             ValueError: If nonzero probability mass is requested trimmed.
         """
         if (
@@ -766,18 +751,18 @@ class Histogram:
 
         Args:
             new_vmin: Minimum permitted value for the new histogram's random variable.
-                If None, uses current self.vmin.
+                If None, uses current vmin.
             new_vmax: Maximum permitted value for the new histogram's random variable.
-                If None, uses current self.vmax.
+                If None, uses current vmax.
             new_num_atoms: Number of bins for the new histogram.
-                If None, uses current self.num_atoms.
+                If None, uses current num_atoms.
 
         Returns:
             A new Histogram instance with the rebinned probability mass.
 
         Raises:
-            ValueError: If the new_vmin is larger than the old one.
-            ValueError: If the new_vmax is smaller than the old one.
+            ValueError: If the ```new_vmin``` is larger than ```vmin```
+            ValueError: If the ```new_vmax``` is smaller than ```vmax```.
             RuntimeError: If the algorithm does not function as expected.
                 This should never occur.
         """
@@ -847,7 +832,7 @@ class Histogram:
             A new Histogram instance representing the shifted variable.
 
         Raises:
-            TypeError: If the inputted shift variable is not an int or float.
+            TypeError: If ```scalar``` is not an ```int``` or ```float```.
         """
         if not isinstance(scalar, int) and not isinstance(scalar, float):
             raise TypeError("input 'scalar' must be int or float type.")
@@ -868,11 +853,11 @@ class Histogram:
             other: A Histogram instance to be convolved with.
 
         Returns:
-            A new Histogram instance representing the addition of the random variables.
+            A new ```Histogram``` instance representing the addition of the random variables.
 
         Raises:
-            TypeError: If the inputted 'other' variable is not a Histogram.
-            ValueError: If self.bin_edges != other.bin_edges up to numerical precision.
+            TypeError: If ```other``` is not a ```Histogram```.
+            ValueError: If ```self.bin_edges != other.bin_edges``` up to numerical precision.
         """
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
@@ -899,11 +884,11 @@ class Histogram:
             other: A Histogram instance to be convolved with.
 
         Returns:
-            A new Histogram instance representing the addition of the random variables.
+            A new ```Histogram``` instance representing the addition of the random variables.
 
         Raises:
-            TypeError: If the inputted 'other' variable is not a Histogram.
-            ValueError: If self.bin_edges != other.bin_edges up to numerical precision.
+            TypeError: If ```other``` is not a ```Histogram```.
+            ValueError: If ```self.bin_edges != other.bin_edges``` up to numerical precision.
         """
         if not isinstance(other, Histogram):
             raise TypeError("input 'other' must be Histogram type.")
@@ -930,7 +915,7 @@ class Histogram:
             probs: A numpy.ndarray containing the probabilities to renormalize.
 
         Returns:
-            numpy.ndarray containing the renormalized probabilities.
+            A ```numpy.ndarray``` containing the renormalized probabilities.
 
         Raises:
             ValueError: If the rectified probabilities sum to zero.

@@ -1,0 +1,14 @@
+site_name: Distributional
+site_url: https://distributional.readthedocs.io
+
+theme:
+  name: readthedocs
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
