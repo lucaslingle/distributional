@@ -27,7 +27,7 @@ class Histogram:
             probs: Probabilities for the bins in the histogram.
 
         Returns:
-            A new Histogram instance representing the distribution of the new variable.
+            A new ```Histogram``` instance representing the distribution of the new variable.
 
         Raises:
             TypeError: If ```vmin``` is not an ```int``` or ```float```.
