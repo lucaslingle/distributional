@@ -585,7 +585,7 @@ class Histogram:
                 beyond what is needed to cover the range specified. Defaults to False.
 
         Returns:
-            New Histogram whose bins minimally contain the range [left, right].
+            New Histogram whose bins minimally contain the range ```[left, right]```.
 
         Raises:
             TypeError: If ```left``` is not ```int``` or ```float```.
