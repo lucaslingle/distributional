@@ -23,7 +23,9 @@ pip install .
 For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]```, or ```'.[dev,docs]'```.
 
 ### documentation
-To read the documentation, you can run
+To read online, you can go to https://distributional.readthedocs.io.
+
+To read locally, you can run
 ```
 mkdocs serve
 ```
