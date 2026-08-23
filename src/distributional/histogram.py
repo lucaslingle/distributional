@@ -489,7 +489,9 @@ class Histogram:
         quantile += ((p - summed[i]) / probs[i]) * self.atom_stride
         return quantile.item()
 
-    def sample(self, n: int = 1, rng: Optional[np.random.Generator] = None) -> float:
+    def sample(
+        self, n: int = 1, rng: Optional[np.random.Generator] = None
+    ) -> np.ndarray:
         """Sample n points from the distribution represented by the histogram.
 
         Args:
