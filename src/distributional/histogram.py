@@ -303,11 +303,9 @@ class Histogram:
             h1 = self.trim()
             h2 = other.trim()
             spec = dict(
-                new_vmin=min(self.vmin, other.vmin),
-                new_vmax=max(self.vmax, other.vmax),
-                new_num_atoms=math.ceil(
-                    (self.num_atoms**2 + other.num_atoms**2) ** 0.5
-                ),
+                new_vmin=min(h1.vmin, h2.vmin),
+                new_vmax=max(h1.vmax, h2.vmax),
+                new_num_atoms=math.ceil((h1.num_atoms**2 + h2.num_atoms**2) ** 0.5),
             )
             h1 = h1.rebin(**spec)
             h2 = h2.rebin(**spec)
