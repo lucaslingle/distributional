@@ -4,7 +4,7 @@
 
 Histogram operations library.
 
-### background
+### Background
 
 For continuous random variables that admit a density, a convenient nonparametric approximation is a piecewise constant version of that density.
 
@@ -14,18 +14,28 @@ This identity enables a number of useful operations like rebinning and inverse c
 
 The purpose of this library is unify many of the operations one might wish to perform on random variables, and to model these operations with corresponding piecewise constant densities, or equivalently, with their anodyne histogram representations.
 
-### getting started
-To install from github, clone this repo and run
+### Getting started
+
+To install from PyPI, run
 ```
+pip install distributional
+```
+
+For unit testing and docs dependencies, replace ```distributional``` with ```'distributional[dev]'```, ```'distributional[docs]'```, or ```'distributional[dev,docs]'```.
+
+To build from source, run
+```
+git clone https://github.com/lucaslingle/distributional
+cd distributional
 pip install .
 ```
 
 For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]```, or ```'.[dev,docs]'```.
 
-### documentation
+### Documentation
 To read online, you can go to https://distributional.readthedocs.io.
 
-To read locally, you can run
+To read locally, first install the docs dependencies as outlined above then run
 ```
 mkdocs serve
 ```
