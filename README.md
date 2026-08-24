@@ -12,7 +12,6 @@ To install from PyPI, run
 ```
 pip install distributional
 ```
-
 For unit testing and docs dependencies, replace ```distributional``` with ```'distributional[dev]'```, ```'distributional[docs]'```, or ```'distributional[dev,docs]'```.
 
 To build from source, run
@@ -21,27 +20,22 @@ git clone https://github.com/lucaslingle/distributional
 cd distributional
 pip install .
 ```
-
 For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]'```, or ```'.[dev,docs]'```.
 
 ### Documentation
-To read online, you can go to https://distributional.readthedocs.io.
+To read the documentation online, you can go to https://distributional.readthedocs.io.
 
-To read locally, first install the docs dependencies as outlined above then run
-```
-mkdocs serve
-```
-in the project directory.
+To read the documentation locally, first install the docs dependencies as outlined above then run ```mkdocs serve``` in the project directory.
 
 ### Basic usage
 
 #### Motivation
 
-The insight powering this library is that a histogram can be converted to and from a piecewise constant density, enabling calculations such as rebinning and inverse_cdf calculation to be carried out precisely.
+The insight powering this library is that a histogram can be converted to and from a piecewise constant density, enabling operations such as rebinning and inverse_cdf calculation to be carried out precisely.
 
 #### Construction
 
-The essential class is the Histogram, which can be constructed a several ways. One way is directly, based on a minimum and maximum range, a number of bins, and a probability mass specification:
+The essential class is the Histogram, which can be constructed several ways. One way is directly, based on a minimum and maximum range, a number of bins, and a probability mass specification:
 ```
 unif = Histogram(vmin=-1, vmax=1, num_atoms=2, probs=np.array([0.5, 0.5]))
 ```
