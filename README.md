@@ -1,18 +1,10 @@
 # distributional
 
 [![Tests](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml/badge.svg)](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml)
+[![PyPI](https://img.shields.io/pypi/v/distributional)](https://pypi.org/project/distributional/)
+[![RTD](https://app.readthedocs.org/projects/<project-slug>/badge/?version=latest&style=flat)](https://distributional.readthedocs.io/)
 
 Histogram operations library.
-
-### Background
-
-For continuous random variables that admit a density, a convenient nonparametric approximation is a piecewise constant version of that density.
-
-If one integrates over each interval where the density is piecewise constant and replaces each original locally-constant density value by the value of the integral, one obtains the humble histogram.
-
-This identity enables a number of useful operations like rebinning and inverse cdf calculation to be guided through the lens of the original density view.
-
-The purpose of this library is unify many of the operations one might wish to perform on random variables, and to model these operations with corresponding piecewise constant densities, or equivalently, with their anodyne histogram representations.
 
 ### Getting started
 
@@ -30,7 +22,7 @@ cd distributional
 pip install .
 ```
 
-For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]```, or ```'.[dev,docs]'```.
+For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```'.[docs]'```, or ```'.[dev,docs]'```.
 
 ### Documentation
 To read online, you can go to https://distributional.readthedocs.io.
@@ -40,3 +32,58 @@ To read locally, first install the docs dependencies as outlined above then run
 mkdocs serve
 ```
 in the project directory.
+
+### Basic usage
+
+#### Motivation
+
+The insight powering this library is that a histogram can be converted to and from a piecewise constant density, enabling calculations such as rebinning and inverse_cdf calculation to be carried out precisely.
+
+#### Construction
+
+The essential class is the Histogram, which can be constructed a several ways. One way is directly, based on a minimum and maximum range, a number of bins, and a probability mass specification:
+```
+unif = Histogram(vmin=-1, vmax=1, num_atoms=2, probs=np.array([0.5, 0.5]))
+```
+
+Another way is from data:
+```
+emp = Histogram.empirical(np.random.normal(size=[10000]))
+```
+which by default automatically determines the number of bins from the number of datapoints.
+
+#### Arithmetic
+
+Histograms can be added, subtracted, shifted, and scaled:
+```
+h = Histogram.empirical(np.random.normal(size=[10000]))
+h2 = 1 - 0.5 * h
+```
+These arithmetic operations are lifted from those performed directly on the underlying random variables.
+
+Continuing, let's write
+```
+h3 = h2 + h
+```
+Addition/subtraction of histograms is treated as addition/subtraction of independent random variables, and is carried out via convolution.
+
+#### Rebinning
+
+Histograms involved in arithmetic operations may not have the same bins.
+
+The addition and subtraction operators automatically rebin the operands to enable seamless arithmetic on histograms; e.g., h3 was computed without manual rebinning.
+
+Manual rebinning is also possible:
+```
+h4 = h3.rebin(-10, 10, 500)
+```
+
+#### Beyond
+
+The library also supports many other operations, such as cdf, inverse_cdf, conditioning the random variable to fall in an open interval, plotting, and summary statistics such as expectation, variance, median, mode, and differential entropy.
+
+Distributions can also be formed via mixtures. Rebinning, padding with and trimming with zero-mass bins, and renormalizing to minimize numerical error are also supported.
+
+These operations can be chained together to support complex pipelines, e.g.:
+- conditioning on a union of open intervals (via a mixture of conditioned histograms)
+- computing tail measures like expected shortfall (condition on quantile and take expectation)
