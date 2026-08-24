@@ -25,7 +25,7 @@ For unit testing and docs dependencies, replace ```.``` with ```'.[dev]'```, ```
 ### Documentation
 To read the documentation online, you can go to https://distributional.readthedocs.io.
 
-To read the documentation locally, first install the docs dependencies as outlined above then run ```mkdocs serve``` in the project directory.
+To read the documentation locally, install the docs dependencies then run ```mkdocs serve``` in the project directory.
 
 ### Basic usage
 
