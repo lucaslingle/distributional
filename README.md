@@ -1,8 +1,8 @@
 # distributional
 
 [![Tests](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml/badge.svg)](https://github.com/lucaslingle/distributional/actions/workflows/pytest.yml)
-[![PyPI](https://img.shields.io/pypi/v/distributional)](https://pypi.org/project/distributional/)
 [![RTD](https://app.readthedocs.org/projects/distributional/badge/?version=latest&style=flat)](https://distributional.readthedocs.io/)
+[![PyPI](https://img.shields.io/pypi/v/distributional)](https://pypi.org/project/distributional/)
 
 Histogram operations library.
 
