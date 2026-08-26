@@ -78,11 +78,50 @@ def test_init_guard_clauses():
         )
 
 
+def test_from_data_guard_clauses():
+    with pytest.raises(ValueError):
+        Histogram.from_data(np.eye(2))
+    with pytest.raises(TypeError):
+        Histogram.from_data(np.array([0.5, 0.1, 0.8]), num_atoms=0.1)
+
+
+def test_from_atoms_guard_clauses():
+    Histogram.from_atoms(np.array([0.0, 1.0]), np.array([0.5, 0.5]))  # should pass
+    with pytest.raises(ValueError):
+        Histogram.from_atoms(np.array([0.0, 1.0])[..., None], np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        Histogram.from_atoms(np.array([0.0]), np.array([1.0]))
+    with pytest.raises(ValueError):
+        Histogram.from_atoms(np.array([0.0, 0.5, 1.0]), np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        Histogram.from_atoms(
+            np.array([0.0, 0.3, 1.0]), np.array([1 / 3 for _ in range(3)])
+        )
+    with pytest.raises(ValueError):
+        Histogram.from_atoms(
+            np.array([0.5, 0.0, -0.5]), np.array([1 / 3 for _ in range(3)])
+        )
+
+
+def test_from_bins_guard_clauses():
+    Histogram.from_bins(np.array([0.0, 0.5, 1.0]), np.array([0.5, 0.5]))  # should pass
+    with pytest.raises(ValueError):
+        Histogram.from_bins(np.array([0.0, 0.5, 1.0])[..., None], np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        Histogram.from_bins(np.array([0.0]), np.array([1.0]))
+    with pytest.raises(ValueError):
+        Histogram.from_bins(np.array([0.0, 1.0]), np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        Histogram.from_bins(np.array([0.0, 0.3, 1.0]), np.array([0.5, 0.5]))
+    with pytest.raises(ValueError):
+        Histogram.from_bins(np.array([0.5, 0.0, -0.5]), np.array([0.5, 0.5]))
+
+
 def test_empirical_guard_clauses():
     with pytest.raises(ValueError):
-        unif_histogram(10).empirical(np.eye(2))
+        Histogram.empirical(np.eye(2))
     with pytest.raises(TypeError):
-        unif_histogram(10).empirical(np.array([0.5, 0.1, 0.8]), num_atoms=0.1)
+        Histogram.empirical(np.array([0.5, 0.1, 0.8]), num_atoms=0.1)
 
 
 def test_mixture_guard_clauses():

@@ -29,22 +29,29 @@ To read the documentation locally, install the docs dependencies then run ```mkd
 
 ### Basic usage
 
-#### Motivation
-
-The insight powering this library is that a histogram can be converted to and from a piecewise constant density, enabling operations such as rebinning and inverse_cdf calculation to be carried out precisely.
-
 #### Construction
 
-The essential class is the Histogram, which can be constructed several ways. One way is directly, based on a minimum and maximum range, a number of bins, and a probability mass specification:
+The essential class is the Histogram, which can be constructed several ways.
+
+The first way is directly, using a min and max value, a number of atoms, and a probability mass array:
 ```
-unif = Histogram(vmin=-1, vmax=1, num_atoms=2, probs=np.array([0.5, 0.5]))
+import numpy as np
+unif1 = Histogram(vmin=-1, vmax=1, num_atoms=2, probs=np.array([0.5, 0.5]))
 ```
 
-Another way is from data:
+You can instead specify the atoms (bin centers), or the bin edges themselves:
 ```
-emp = Histogram.empirical(np.random.normal(size=[10000]))
+unif2 = Histogram.from_atoms(atoms=np.array([-0.5, 0.5]), probs=np.array([0.5, 0.5]))
+unif3 = Histogram.from_bins(bins=np.array([-1, 0, 1]), probs=np.array([0.5, 0.5]))
 ```
-which by default automatically determines the number of bins from the number of datapoints.
+Note that `unif1`, `unif2` and `unif3` all have the same bins and probabilities.
+
+If you have a dataset you're modeling, you can fit a histogram as follows:
+```
+data = np.random.normal(size=[10000])
+empirical = Histogram.from_data(data)
+```
+By default, `Histogram.from_data` determines the number of atoms from the dataset size.
 
 #### Arithmetic
 
@@ -74,10 +81,21 @@ h4 = h3.rebin(-10, 10, 500)
 
 #### Beyond
 
-The library also supports many other operations, such as cdf, inverse_cdf, conditioning the random variable to fall in an open interval, plotting, and summary statistics such as expectation, variance, median, mode, and differential entropy.
+The library also supports many other operations, such as cdf, inverse_cdf/quantile, conditioning the random variable to fall in an interval, plotting, and summary statistics such as expectation, variance, median, mode, and differential entropy.
 
-Distributions can also be formed via mixtures. Rebinning, padding with and trimming with zero-mass bins, and renormalizing to minimize numerical error are also supported.
+Distributions can also be formed via mixtures. Rebinning, padding with and trimming away zero-mass bins, and renormalizing to minimize numerical error are also supported.
 
 These operations can be chained together to support complex pipelines, e.g.:
-- conditioning on a union of open intervals (via a mixture of conditioned histograms)
-- computing tail measures like expected shortfall (condition on quantile and take expectation)
+
+- We can condition on a union of intervals via a mixture of conditioned histograms:
+```
+h5 = Histogram.from_data(np.random.normal(size=[10000]))
+left_tail = h5.condition(right=h5.quantile(0.05))
+right_tail = h5.condition(left=h5.quantile(0.95))
+tails = Histogram.from_mixture(hists=[left_tail, right_tail], weights=[0.5, 0.5])
+```
+
+- We can compute a tail measure like the expected shortfall at 5%:
+```
+es_05 = h5.condition(right=h5.quantile(0.05)).expectation
+```

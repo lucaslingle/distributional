@@ -65,6 +65,103 @@ class Histogram:
         self._probs = probs
 
     @classmethod
+    def from_data(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
+        """Alias for [empirical][distributional.histogram.Histogram.empirical]."""
+        return Histogram.empirical(vs, num_atoms)
+
+    @classmethod
+    def from_atoms(cls, atoms: np.ndarray, probs: np.ndarray) -> "Histogram":
+        """Create a Histogram instance from the provided atoms and probabilities.
+
+        Args:
+            atoms: A numpy.ndarray of atoms (bin centers).
+            probs: A numpy.ndarray of probability masses for each atom (bin).
+
+        Returns:
+            A new `Histogram` instance with the given specification.
+
+        Raises:
+            ValueError: If `atoms` is not one-dimensional.
+            ValueError: If `atoms` is a singleton array (no way to infer vmin and vmax).
+            ValueError: If `atoms` has a different shape than `probs`.
+            ValueError: If `atoms` entries are not evenly spaced.
+            ValueError: If `atoms` entries are not in ascending order.
+        """
+        if len(atoms.shape) > 1:
+            raise ValueError("input 'atoms' must be one-dimensional.")
+        if atoms.shape[0] == 1:
+            raise ValueError("input 'atoms' must have first axis length > 1.")
+        if atoms.shape != probs.shape:
+            raise ValueError("input 'atoms' and 'probs' must have same shape.")
+        if not np.allclose(
+            atoms[1:] - atoms[:-1],
+            np.full(fill_value=atoms[1] - atoms[0], shape=(atoms.shape[0] - 1,)),
+        ):
+            raise ValueError("input 'atoms' must have constant atom stride.")
+        if atoms[1] - atoms[0] <= 0:
+            raise ValueError("input 'atoms' entries must be in ascending order.")
+
+        atom_stride = atoms[1] - atoms[0]
+        vmin = atoms[0] - atom_stride / 2
+        vmax = atoms[-1] + atom_stride / 2
+        num_atoms = atoms.shape[0]
+        return Histogram(
+            vmin=vmin,
+            vmax=vmax,
+            num_atoms=num_atoms,
+            probs=probs,
+        )
+
+    @classmethod
+    def from_bins(cls, bins: np.ndarray, probs: np.ndarray) -> "Histogram":
+        """Create a Histogram instance from the provided bins and probabilities.
+
+        Args:
+            bins: A numpy.ndarray of bin edges.
+            probs: A numpy.ndarray of probability masses for each atom (bin).
+
+        Returns:
+            A new `Histogram` instance with the given specification.
+
+        Raises:
+            ValueError: If `bins` is not one-dimensional.
+            ValueError: If `bins` has only one entry.
+            ValueError: If `bins.shape[0] - 1 != probs.shape[0]`.
+            ValueError: If `bins` entries are not evenly spaced.
+            ValueError: If `bins` entries are not in ascending order.
+        """
+        if len(bins.shape) > 1:
+            raise ValueError("input 'bins' must be one-dimensional.")
+        if bins.shape[0] == 1:
+            raise ValueError("input 'bins' must have first axis length > 1.")
+        if bins.shape[0] - 1 != probs.shape[0]:
+            raise ValueError("input bins.shape[0] - 1 != probs.shape[0].")
+        if not np.allclose(
+            bins[1:] - bins[:-1],
+            np.full(fill_value=bins[1] - bins[0], shape=(bins.shape[0] - 1,)),
+        ):
+            raise ValueError("input 'bins' must have constant atom stride.")
+        if bins[1] - bins[0] <= 0:
+            raise ValueError("input 'bins' entries must be in ascending order.")
+
+        vmin = bins[0]
+        vmax = bins[-1]
+        num_atoms = bins.shape[0] - 1
+        return Histogram(
+            vmin=vmin,
+            vmax=vmax,
+            num_atoms=num_atoms,
+            probs=probs,
+        )
+
+    @classmethod
+    def from_mixture(
+        cls, hists: List["Histogram"], weights: List[float]
+    ) -> "Histogram":
+        """Alias for [mixture][distributional.histogram.Histogram.mixture]."""
+        return Histogram.mixture(hists, weights)
+
+    @classmethod
     def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
         """Create a Histogram instance fit to the data.
 
@@ -486,6 +583,10 @@ class Histogram:
         quantile = atoms[i] - self.atom_stride / 2
         quantile += ((p - summed[i]) / probs[i]) * self.atom_stride
         return quantile.item()
+
+    def quantile(self, p: float) -> float:
+        """Alias for [inverse_cdf][distributional.histogram.Histogram.inverse_cdf]."""
+        return self.inverse_cdf(p)
 
     def sample(
         self, n: int = 1, rng: Optional[np.random.Generator] = None
