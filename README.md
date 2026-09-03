@@ -70,9 +70,11 @@ Addition/subtraction of histograms is treated as addition/subtraction of indepen
 
 #### Rebinning
 
-By default, the addition/subtraction operators automatically rebin the operands to enable seamless arithmetic on histograms; e.g., h3 was computed without manual rebinning.
+By default, the addition/subtraction operators automatically rebin the operands, to enable seamless arithmetic on histograms with different bins; e.g., h3 was computed without manual rebinning.
 
-Manual rebinning is also possible:
+The automatic rebinning strategy is configurable via the autorebin argument ('none', 'count', or 'stride', default 'stride') — see the [API reference](https://distributional.readthedocs.io) for details.
+
+Manual rebinning is also possible at any time:
 ```
 h4 = h3.rebin(-10, 10, 500)
 ```
