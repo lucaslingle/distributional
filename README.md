@@ -57,7 +57,7 @@ By default, `Histogram.from_data` determines the number of atoms from the datase
 
 Histograms can be added, subtracted, shifted, and scaled:
 ```
-h = Histogram.empirical(np.random.normal(size=[10000]))
+h = Histogram.from_data(np.random.normal(size=[10000]))
 h2 = 1 - 0.5 * h
 ```
 These arithmetic operations are lifted from those performed directly on the underlying random variables.
@@ -70,14 +70,15 @@ Addition/subtraction of histograms is treated as addition/subtraction of indepen
 
 #### Rebinning
 
-Histograms involved in arithmetic operations may not have the same bins.
+By default, the addition/subtraction operators automatically rebin the operands, to enable seamless arithmetic on histograms with different bins; e.g., h3 was computed without manual rebinning.
 
-The addition and subtraction operators automatically rebin the operands to enable seamless arithmetic on histograms; e.g., h3 was computed without manual rebinning.
+The automatic rebinning strategy is configurable via the autorebin argument ('none', 'count', or 'stride', default 'stride') — see the [API reference](https://distributional.readthedocs.io) for details.
 
-Manual rebinning is also possible:
+Manual rebinning is also possible at any time:
 ```
 h4 = h3.rebin(-10, 10, 500)
 ```
+The rebin method redistributes probability mass according to the intersection between old and new bins.
 
 #### Beyond
 

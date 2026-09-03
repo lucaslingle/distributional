@@ -2,6 +2,7 @@ import bisect
 import logging
 import math
 from typing import List
+from typing import Literal
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -156,10 +157,13 @@ class Histogram:
 
     @classmethod
     def from_mixture(
-        cls, hists: List["Histogram"], weights: List[float]
+        cls,
+        hists: List["Histogram"],
+        weights: List[float],
+        autorebin: Literal["none", "count", "stride"] = "stride",
     ) -> "Histogram":
         """Alias for [mixture][distributional.histogram.Histogram.mixture]."""
-        return Histogram.mixture(hists, weights)
+        return Histogram.mixture(hists, weights, autorebin)
 
     @classmethod
     def empirical(cls, vs: np.ndarray, num_atoms: Optional[int] = None) -> "Histogram":
@@ -184,8 +188,8 @@ class Histogram:
         if num_atoms is None:
             num_atoms = math.ceil(vs.shape[0] ** 0.5)
 
-        vmin = np.min(vs, axis=-1)
-        vmax = np.max(vs, axis=-1)
+        vmin = np.min(vs, axis=-1).item()
+        vmax = np.max(vs, axis=-1).item()
         atom_stride = (vmax - vmin) / num_atoms
 
         idxs = np.floor((vs - vmin) / atom_stride).astype(np.int32)
@@ -203,13 +207,21 @@ class Histogram:
         )
 
     @classmethod
-    def mixture(cls, hists: List["Histogram"], weights: List[float]) -> "Histogram":
+    def mixture(
+        cls,
+        hists: List["Histogram"],
+        weights: List[float],
+        autorebin: Literal["none", "count", "stride"] = "stride",
+    ) -> "Histogram":
         """Create a Histogram for random variable ```Y = i1 * X1 + ... + iN * XN``` where one of ```i1, ..., iN``` is 1 and the rest 0, the probability that ```ik == 1``` is ```weights[k]```, and the distribution of ```Xk``` is modeled by ```hists[k]``` and is independent of ```i1, ..., iN```.
 
         Args:
             hists: List of Histograms serving as clusters for the mixture.
                 The Histograms are rebinned automatically to enable their mixture.
             weights: List of floats serving as weights for the mixture.
+            autorebin: Auto-rebin strategy. One of 'none', 'count', 'stride'.
+                For discussion of the strategies, see [autorebin][distributional.histogram.Histogram.autorebin].
+                Default value is 'stride'.
 
         Returns:
             A new ```Histogram``` representing the mixture distribution.
@@ -232,16 +244,7 @@ class Histogram:
         if min(weights) < 0.0:
             raise ValueError("input 'weights' must be all non-negative.")
 
-        hists = [h.trim() for h in hists]
-        new_vmin = min(h.vmin for h in hists)
-        new_vmax = max(h.vmax for h in hists)
-        new_num_atoms = math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5)
-        spec = dict(
-            new_vmin=new_vmin,
-            new_vmax=new_vmax,
-            new_num_atoms=new_num_atoms,
-        )
-        hists = [h.rebin(**spec) for h in hists]
+        hists = Histogram.autorebin(hists, strategy=autorebin)
         return Histogram._mix(hists, weights)
 
     @property
@@ -310,18 +313,18 @@ class Histogram:
         """
         supp = self.support
         edges = self.bin_edges
-        return edges[0:-1][supp[0]], edges[1:][supp[-1]]
+        return edges[0:-1][supp[0]].item(), edges[1:][supp[-1]].item()
 
     @property
     def expectation(self) -> float:
         """float: The expectation (mean) of the histogram."""
-        return np.sum(self.atoms * self.probs, axis=-1)
+        return np.sum(self.atoms * self.probs, axis=-1).item()
 
     @property
     def variance(self) -> float:
         """float: The variance of the histogram."""
         mu = self.expectation
-        return np.sum(np.square(self.atoms - mu) * self.probs, axis=-1)
+        return np.sum(np.square(self.atoms - mu) * self.probs, axis=-1).item()
 
     @property
     def median(self) -> float:
@@ -382,11 +385,18 @@ class Histogram:
         ls.append(")")
         return "".join(ls)
 
-    def __add__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
+    def __add__(
+        self,
+        other: Union[int, float, "Histogram"],
+        autorebin: Literal["none", "count", "stride"] = "stride",
+    ) -> "Histogram":
         """Adds a scalar or an independent random variable to the current histogram's random variable.
 
         Args:
             other: An int, float, or Histogram instance.
+            autorebin: Auto-rebin strategy. One of 'none', 'count', 'stride'.
+                For discussion of the strategies, see [autorebin][distributional.histogram.Histogram.autorebin].
+                Default value is 'stride'.
 
         Returns:
             A new ```Histogram``` instance representing the distribution of the new variable.
@@ -397,15 +407,7 @@ class Histogram:
         if isinstance(other, int) or isinstance(other, float):
             return self.shift(other)
         if isinstance(other, Histogram):
-            h1 = self.trim()
-            h2 = other.trim()
-            spec = dict(
-                new_vmin=min(h1.vmin, h2.vmin),
-                new_vmax=max(h1.vmax, h2.vmax),
-                new_num_atoms=math.ceil((h1.num_atoms**2 + h2.num_atoms**2) ** 0.5),
-            )
-            h1 = h1.rebin(**spec)
-            h2 = h2.rebin(**spec)
+            h1, h2 = Histogram.autorebin([self, other], strategy=autorebin)
             return h1.convolve(h2)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
@@ -439,11 +441,18 @@ class Histogram:
         """
         return self.__mul__(-1)
 
-    def __sub__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
+    def __sub__(
+        self,
+        other: Union[int, float, "Histogram"],
+        autorebin: Literal["none", "count", "stride"] = "stride",
+    ) -> "Histogram":
         """Subtracts a scalar or an independent random variable from the current histogram's random variable.
 
         Args:
             other: An int, float, or Histogram instance.
+            autorebin: Auto-rebin strategy. One of 'none', 'count', 'stride'.
+                For discussion of the strategies, see [autorebin][distributional.histogram.Histogram.autorebin].
+                Default value is 'stride'.
 
         Returns:
             A new ```Histogram``` instance representing the distribution of the new variable.
@@ -456,14 +465,21 @@ class Histogram:
             or isinstance(other, float)
             or isinstance(other, Histogram)
         ):
-            return self.__add__(-other)
+            return self.__add__(-other, autorebin=autorebin)
         raise TypeError("input 'other' must be int, float, or Histogram type.")
 
-    def __radd__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
+    def __radd__(
+        self,
+        other: Union[int, float, "Histogram"],
+        autorebin: Literal["none", "count", "stride"] = "stride",
+    ) -> "Histogram":
         """Adds a scalar or an independent random variable to the current histogram's random variable.
 
         Args:
             other: An int, float, or Histogram instance.
+            autorebin: Auto-rebin strategy. One of 'none', 'count', 'stride'.
+                For discussion of the strategies, see [autorebin][distributional.histogram.Histogram.autorebin].
+                Default value is 'stride'.
 
         Returns:
             A new ```Histogram``` instance representing the distribution of the new variable.
@@ -471,7 +487,7 @@ class Histogram:
         Raises:
             TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
-        return self.__add__(other)
+        return self.__add__(other, autorebin=autorebin)
 
     def __rmul__(self, other: Union[int, float]) -> "Histogram":
         """Multiplies the current histogram's random variable by a scalar.
@@ -487,11 +503,18 @@ class Histogram:
         """
         return self.__mul__(other)
 
-    def __rsub__(self, other: Union[int, float, "Histogram"]) -> "Histogram":
+    def __rsub__(
+        self,
+        other: Union[int, float, "Histogram"],
+        autorebin: Literal["none", "count", "stride"] = "stride",
+    ) -> "Histogram":
         """Subtracts the current histogram's random variable from a scalar or an independent random variable.
 
         Args:
             other: An int, float, or Histogram instance to be subtracted from.
+            autorebin: Auto-rebin strategy. One of 'none', 'count', 'stride'.
+                For discussion of the strategies, see [autorebin][distributional.histogram.Histogram.autorebin].
+                Default value is 'stride'.
 
         Returns:
             A new Histogram instance representing the distribution of the new variable.
@@ -499,7 +522,7 @@ class Histogram:
         Raises:
             TypeError: If ```other``` is not an ```int```, ```float```, or ```Histogram```.
         """
-        return self.__sub__(other).__mul__(-1)
+        return self.__sub__(other, autorebin=autorebin).__mul__(-1)
 
     def plot(self) -> None:
         """Plot the histogram using matplotlib."""
@@ -1053,3 +1076,60 @@ class Histogram:
             num_atoms=hists[0].num_atoms,
             probs=Histogram.renormalize(new_probs),
         )
+
+    @staticmethod
+    def autorebin(
+        hists: List["Histogram"], strategy: Literal["none", "count", "stride"]
+    ) -> List["Histogram"]:
+        """Automatically rebin a collection of Histograms according to a predetermined strategy.
+
+        Args:
+            hists: List of Histograms to rebin.
+            strategy: Auto-rebin strategy. One of 'none', 'count', 'stride':
+
+                * Strategy 'stride' uses the minimum `atom_stride` from the individual Histograms
+                    to serve as the new `atom_stride` for rebinning, and takes
+                    `vmin` and `vmax` from the minimum and maximum of the individual `vmin` and `vmax`.
+                * Strategy 'count' uses the l2 norm of the vector of `num_atoms` counts
+                    to serve as the new `num_atoms` count for rebinning, and takes
+                    `vmin` and `vmax` from the minimum and maximum of the individual `vmin` and `vmax`.
+                * Strategy 'none' performs no rebinning.
+
+        Returns:
+            List of rebinned Histograms.
+
+        Raises:
+            ValueError: If `strategy` is not one of `'none'`, `'count'`, or `'stride'`.
+        """
+        if strategy == "none":
+            return Histogram._autorebin_none(hists)
+        if strategy == "count":
+            return Histogram._autorebin_count(hists)
+        if strategy == "stride":
+            return Histogram._autorebin_stride(hists)
+        raise ValueError(
+            "Input 'strategy' must be one of 'none', 'count', or 'stride'."
+        )
+
+    @staticmethod
+    def _autorebin_none(hists: List["Histogram"]) -> List["Histogram"]:
+        return hists
+
+    @staticmethod
+    def _autorebin_count(hists: List["Histogram"]) -> List["Histogram"]:
+        hists = [h.trim() for h in hists]
+        vmin = min(h.vmin for h in hists)
+        vmax = max(h.vmax for h in hists)
+        num_atoms = math.ceil(sum(h.num_atoms**2 for h in hists) ** 0.5)
+        hists = [h.rebin(vmin, vmax, num_atoms) for h in hists]
+        return hists
+
+    @staticmethod
+    def _autorebin_stride(hists: List["Histogram"]) -> List["Histogram"]:
+        hists = [h.trim() for h in hists]
+        vmin = min(h.vmin for h in hists)
+        vmax = max(h.vmax for h in hists)
+        atom_stride = min(h.atom_stride for h in hists)
+        num_atoms = int(math.ceil((vmax - vmin) / atom_stride))
+        hists = [h.rebin(vmin, vmax, num_atoms) for h in hists]
+        return hists
