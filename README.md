@@ -72,12 +72,6 @@ Addition/subtraction of histograms is treated as addition/subtraction of indepen
 
 By default, the addition/subtraction operators automatically rebin the operands to enable seamless arithmetic on histograms; e.g., h3 was computed without manual rebinning.
 
-The default strategy for automatic rebinning is 'stride'. That is, the definition of h3 is equivalent to
-```
-h3 = h2.__add__(h, strategy='stride')
-```
-The 'stride' strategy sets the operands' new vmin and vmax to the minimum and maximum of the pair's original vmin and vmax settings, and it sets the bin stride to the minimum of the operands' original bin strides. Other strategies include 'count' and 'none'.
-
 Manual rebinning is also possible:
 ```
 h4 = h3.rebin(-10, 10, 500)
